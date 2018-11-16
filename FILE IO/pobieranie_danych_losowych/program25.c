@@ -1,7 +1,9 @@
-// vim
-//program losuje 1024^2 liczby
-//
-//open, read, write, close
+// Program generuje plik binarny zawierający liczby zmiennoprzecinkowe double.
+// Pobierane są z urządzenia /dev/urandom
+// Weryfikacja, czy dane nie reprezentują wartości specjanej (NaN) za pomocą fpclassify
+// Niepoprawne liczby są losowane ponownie
+// 
+// Program na konsoli pokazuje jakie liczby zostały zamienione
 //
 #include <stdlib.h>
 #include <unistd.h>
@@ -9,21 +11,16 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <math.h>
+#include <string.h>
 
-#define lb (1024*1024/sizeof(double))
+#define LB (64*1024/sizeof(double))
 
 long int d_lb;
 char* sciezka;
 
 
 int main(int argc, char* argv[])
-
 {
-	/*if(argc != 3)
-	{
-		perror("Niewlasciwa liczba parametrów.\n-d <<int> rozmiar pliku z wynikami>\n-o <sciezka do pliku z wynikami>\n");
-		return 1;
-	}*/
 
 	//sprawdzamy poprawność parametrów
 	//
@@ -39,42 +36,49 @@ int main(int argc, char* argv[])
 			break;
 		case 'o':
 			if(optarg == NULL)
-				perror("parametr-o nie moze byc nullem");
+				perror("parametr -o nie moze byc nullem");
 			sciezka = optarg;
 			break;
 		case '?':
-			perror("Niewlasciwa skladnia\n");
 			break;
 	}
 
-	//printf("%s\n", sciezka);
 	mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
 	int file = open(sciezka, O_WRONLY | O_CREAT, mode);
 
-	int randomData = open("/dev/urandom", O_RDONLY); //1.czy tutaj mam zdefiniowac wielkosc jakos??
+	int randomData = open("/dev/urandom", O_RDONLY, mode);
 	if (randomData < 0)
 	{
-		printf("Cos poszlo nie tak :(\n");
+		printf("/dev/urandom error\n");
 		return 1;
 	}
 
+	double myRandomData[LB*d_lb];
+	memset(myRandomData, 0, LB*d_lb);
 
-	double myRandomData[lb*d_lb];
-	ssize_t result = read(randomData, myRandomData, sizeof(myRandomData));
 	ssize_t nbytes = sizeof(myRandomData);
+	ssize_t result = read(randomData, myRandomData, nbytes);
+	if(result < 0)
+	{
+		perror("reading randomData error\n");
+		return 1;
+	}
 
-	for(int i =0; i<lb*d_lb; i++) //lb * -d, które jest intem przekazywanym przez parametr
+	for(int i =0; i<LB*d_lb; i++) //lb * -d, które jest intem przekazywanym przez parametr
 	{
 		while( fpclassify(myRandomData[i]) != FP_NORMAL )
 		{
+			//dla pewnosci drukujemy nany, sprawdzamy, czy udało się je zamienić
+			printf("Podmieniam nan %d: -> %lg", i, myRandomData[i]);
 			read(randomData, (myRandomData+i), sizeof(double));
+			printf("-> %lg\n", myRandomData[i]);
 			//podmienia jedna w kolko, dopoki jest NAN	
 		}	
 	}
 	
-	//ssize_t bytes_written = write(file, myRandomData, nbytes);
-	write(file, myRandomData, nbytes);
-
+	ssize_t bytes_written = write(file, myRandomData, nbytes);
+	if(bytes_written < 0)
+			perror("bytes_written error");
 
 	return 0;
 }
