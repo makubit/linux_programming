@@ -1,4 +1,6 @@
-//program wyznacza histogram z danych zawartych w pliku wskazanym parametrem -b (nieobowiązkowy)
+//program wyznacza histogram z danych zawartych w pliku wskazanym parametrem pozycyjnym argv[1]
+//parametrem -b możemy określić liczbę przedziałów na którą chcemy podzielić liczbę double -> domyślna wartość 64; warunek: (b>1)
+//drukowane są do pliku "result" dane o rozłożeniu liczb w przedziałach
 //
 
 #include <stdlib.h>
@@ -8,77 +10,110 @@
 #include <fcntl.h>
 #include <float.h> //zeby miec mozliwosc dodac stala DBL_MAX
 #include <sys/stat.h>
+#include <string.h>
 
-long int lb_przedzialow = 64;
+int rangeNumber = 2;
 
 int main(int argc, char* argv[])
 {
-  if(argv[1] == NULL)
-			 perror("Niewlasciwa sciezka");
-  //printf("%s\n", argv[1]);
-
   int c;
 
   while((c=getopt(argc, argv, "b:")) != -1)
 	 switch(c)
 	 {
 		case 'b':
-		  if(strtol(optarg, NULL, 0) <= 0)
-					 perror("Niepoprawny przedzial\n");
-		  lb_przedzialow = strtol(optarg, NULL, 0);
+		  rangeNumber = strtol(optarg, NULL, 0);
+		  if(rangeNumber < 0)
+			  perror("Wrong range\n");
 		  break;
 
-		default:
-		  break;
+		case '?':
+		  printf("Usage Error\n");
+		  return -1;
 	 }
 
-  int randomDoubles = open(argv[1], O_RDONLY);
+  int randomDoubles = open(argv[optind], O_RDONLY); //otwieramy plik z paramteru pozycyjnego z danymi
+  
   if(randomDoubles <0)
-			 perror("randomDoubles error");
+  {
+	 perror("randomDoubles error");
+	 return 1;
+  }
 
-  double stale_przedzialy = DBL_MAX/lb_przedzialow;
-  printf("%lg\n\n", 2*stale_przedzialy);
-  printf("%lg\n", DBL_MAX);
-  printf("%lg\n", DBL_MIN);
-  printf("%lg\n", DBL_MAX - DBL_MIN);
+  mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
+  int writeFile = open("result", O_CREAT | O_WRONLY, mode);
+  if(writeFile < 0)
+  {
+  	perror("writeFile error\n");
+	return 1;
+  }
+
+  double rangeValue = (DBL_MAX/rangeNumber) * 2;
 
   //liczymy wielkosc pliku
   struct stat st;
-  stat(argv[1], &st);
+  stat(argv[optind], &st);
   ssize_t size = st.st_size;
-  //printf("%d\n", size); -> trzeba pamiętać, że tą wielkość trzeba podzielić jeszcze przez sizeof(double)
-  double buf[size/sizeof(double)];
-  memset(buf, 0, size/sizeof(double));
+  int numbersAmount = size/sizeof(double); //ilosc liczb w pliku
+  double buffSize[numbersAmount];
+  memset(buffSize, 0, numbersAmount);
 
-
-  ssize_t randomDoublesSize = read(randomDoubles, &buf, size);
-
-  int ilosc_lb_w_przedziale = 0;
-
-  double pierwszy_zakres = DBL_MIN;
-  double min = DBL_MIN;
-  double drugi_zakres = min + 2*stale_przedzialy;
-  
-  for(int i = 0; i < 2; i++)
+  ssize_t randomDoublesSize = read(randomDoubles, &buffSize, size);
+  if(randomDoublesSize < 0)
   {
-	printf("Podejscie nr: %d\n", i+1);
+  	perror("randomDoublesSize error\n");
+	return 1;
+  }
+
+  int rangeQuantity = 0;
+
+  double firstRange = -DBL_MAX;
+  double secondRange = firstRange + rangeValue;
+
+  //najpierw zapisujemy do pliku ile mamy liczb i na ile przedzialow dzielimy libczę double
+  char temp[10];
+  sprintf(temp, "%d", numbersAmount);
+  char buff[30] = "# cnt ";
+
+  strcat(buff, temp);
+  strcat(buff, "\n");
+  write(writeFile, buff, sizeof(buff));
+
+  sprintf(temp, "%d", rangeNumber);
+  memset(buff, 0, sizeof(buff)/sizeof(char));
+  strcpy(buff, "# bins ");
+  strcat(buff, temp);
+  strcat(buff, "\n");
+  write(writeFile, buff, sizeof(buff));
+
+  //zabieramy się za rozkładanie danych w przedziałach, gdzie lb_przedziałów to zadana w parametrze -b liczba przedziałów na które mamy podzielić double'a
+  for(int i = 0; i < rangeNumber; i++)
+  {
+	 memset(buff, 0, sizeof(buff)/sizeof(char));
+	 memset(temp, 0, sizeof(temp)/sizeof(char));
+	 sprintf(temp, "%d", i);
+	 strcat(buff, temp);
+	 strcat(buff, ": ");
+	 write(writeFile, buff, sizeof(buff));
+
 	 int j = 0;
-	 while( buf[j] != 0)
+	 while(buffSize[j])
 	 {
-		 if( buf[j] >= pierwszy_zakres && buf[j] < drugi_zakres)
-		 {
-			//printf("%lg\n", buf[j]);
-			ilosc_lb_w_przedziale++;
-		 }
+		 if( buffSize[j] >= firstRange && buffSize[j] < secondRange)
+			rangeQuantity++;
 		 j++;
 	 }
 	 
-	 printf("ilosc liczb w przedziale %lg - %lg: %d\n", pierwszy_zakres, drugi_zakres, ilosc_lb_w_przedziale);
-	 pierwszy_zakres += 2*stale_przedzialy; 
-	 drugi_zakres += 2*stale_przedzialy;
-	 ilosc_lb_w_przedziale = 0;
+	 memset(buff, 0, sizeof(buff)/sizeof(char));
+	 memset(temp, 0, sizeof(temp)/sizeof(char));
+	 sprintf(temp, "%d", rangeQuantity);
+	 strcat(buff, temp);
+	 strcat(buff, "\n");
+	 write(writeFile, buff, sizeof(buff));
+
+	 firstRange += rangeValue; 
+	 secondRange += rangeValue;
+	 rangeQuantity = 0;
   }	 
-
-
 	return 0;
 }
