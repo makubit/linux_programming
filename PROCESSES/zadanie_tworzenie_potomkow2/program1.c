@@ -36,8 +36,7 @@ int main(int argc, char* argv[])
   if(pid_potomka == 0)
   {
     //pierwszy potomek, tutaj tworzymy grupę
-    setsid(); //towrzymy grupę
-    //pid_t pid;
+    //setsid(); //towrzymy grupę
 
     for(int i =0; i<20; i++)
     {
@@ -46,11 +45,16 @@ int main(int argc, char* argv[])
 
       if(pid == 0)
       {
-        //printf("Nowy potomek\n");
+       printf("Nowy potomek\n");
        //petla nieskonczona
+       //sleep(2);
+       //while(1)
+       //{}
+       return -1;
       }
 
       //return -1;
+      //break;
 
     }
 
@@ -62,7 +66,7 @@ int main(int argc, char* argv[])
 
 
 //killpg setpgid
-  if(pid == 0)
+ /* if(pid == 0)
   {
     //printf("Child process\n");
     sleep(2);
@@ -77,7 +81,7 @@ int main(int argc, char* argv[])
     //sleep(lb);
     pid_t waiting = wait(&status);
     printf("%d\n", waiting);
-  }
+  }*/
 
 
 

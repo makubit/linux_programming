@@ -6,6 +6,7 @@
 //program działa, dopóki ręcznie nie usuniemy pliku .gen-live
 //w tym czasie możemy przeglądać plik wynikowy o nazwie podanej w parametrze -o
 //jeżeli usuniemy flagę .gen-live, plik result również zostanie usunięty
+//vim: sw=2 sts=2 et :
 //
 #include <stdio.h>
 #include <fcntl.h>
@@ -112,7 +113,7 @@ int main(int argc, char* argv[])
 	
 	//tworzymy zmienne potrzebne do wykonywania przeszukania pliku pod względem zmiennych z zadanego przedziału histogramu
 	double firstRange = -DBL_MAX;
-   double secondRange = firstRange + rangeValue;
+	double secondRange = firstRange + rangeValue;
 
 	for(int i=0; i<noRange; i++)
 	{

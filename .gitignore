@@ -1,0 +1,16 @@
+# Don't track conctent of this folders:
+getopt_exercises/
+
+
+# Compiled source
+*.com
+*.class
+*.dll
+*.exe
+*.o
+*.out
+*.swp
+*.so
+*.swn
+*.swk
+

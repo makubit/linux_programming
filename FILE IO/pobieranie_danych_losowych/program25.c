@@ -14,7 +14,6 @@
 #include <string.h>
 
 #define LB (64*1024/sizeof(double))
-
 long int d_lb;
 char* sciezka;
 
@@ -54,6 +53,7 @@ int main(int argc, char* argv[])
 	}
 
 	double myRandomData[LB*d_lb];
+	//printf("\n%ld\n%d\n", LB*d_lb, sizeof(myRandomData)/sizeof(double));
 	memset(myRandomData, 0, LB*d_lb);
 
 	ssize_t nbytes = sizeof(myRandomData);
@@ -69,9 +69,9 @@ int main(int argc, char* argv[])
 		while( fpclassify(myRandomData[i]) != FP_NORMAL )
 		{
 			//dla pewnosci drukujemy nany, sprawdzamy, czy udało się je zamienić
-			printf("Podmieniam nan %d: -> %lg", i, myRandomData[i]);
+			/*printf("Podmieniam nan %d: -> %lg", i, myRandomData[i]);*/
 			read(randomData, (myRandomData+i), sizeof(double));
-			printf("-> %lg\n", myRandomData[i]);
+			//printf("-> %lg\n", myRandomData[i]);
 			//podmienia jedna w kolko, dopoki jest NAN	
 		}	
 	}

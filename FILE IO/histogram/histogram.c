@@ -114,6 +114,9 @@ int main(int argc, char* argv[])
 	 firstRange += rangeValue; 
 	 secondRange += rangeValue;
 	 rangeQuantity = 0;
-  }	 
+  }
+
+	close(writeFile);
+      	close(randomDoubles);	
 	return 0;
 }
