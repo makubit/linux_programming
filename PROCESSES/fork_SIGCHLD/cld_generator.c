@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <time.h>
 
 int main(int argc, char* argv[])
 {
@@ -71,7 +72,25 @@ int main(int argc, char* argv[])
 			}
 
 		  //PRZYPADEK KIEDY NIE BYŁO PARAMETRU
-			
+			else 
+			{
+				struct timespec time1, time2;
+				time1.tv_sec = 1 ;
+				long int nsecL = strtol(argv[idx], NULL, 0);
+				//if((nsecL*10000000L)>1000000000L)
+				nsecL *= 10000000L;
+				time1.tv_nsec = nsecL;
+
+				nanosleep(&time1, &time2);
+				printf("Wyspany!\n");
+				
+				//drukuje nam jakas randomowa liczbe z zakresu 0-127
+				srand(time(0));
+				int random = rand() % (127 + 1);
+				//printf("->%d\n", random);
+
+				return random;
+			}
 			return 0;
 		}
 			
