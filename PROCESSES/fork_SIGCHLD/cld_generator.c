@@ -96,8 +96,8 @@ int main(int argc, char* argv[])
 			else 
 			{
 				struct timespec time1, time2;
-				time1.tv_sec = floatVar / NANOSEC;
-				time1.tv_nsec = (long)(floatVar*NANOSEC) % NANOSEC;
+				time1.tv_sec = floatVar / 100;
+				time1.tv_nsec = (long)(floatVar*NANOSEC/100) % NANOSEC;
 
 				nanosleep(&time1, &time2);
 				printf("Wyspany!\n");
@@ -154,24 +154,33 @@ int main(int argc, char* argv[])
 
 		//definiujemy sobie naszą kolejną strukturę czasu
 		struct timespec time1, time2;
-		time1.tv_sec = (childrenMin / 2) / NANOSEC;
-		time1.tv_nsec = (long)((childrenMin/2) * NANOSEC) % NANOSEC;
+		printf("Children min: %f",childrenMin);
+		time1.tv_sec = (long)(childrenMin / 2) / 100;
+		time1.tv_nsec = (long)((childrenMin/2) * NANOSEC/100) % NANOSEC;
+		printf("--%ld, %ld--", time1.tv_sec, time1.tv_nsec);
 
-		nanosleep(&time1, &time2);
+		//nanosleep(&time1, NULL);
 		
 		int i = 0;
 		while(i < childrenNumber)
 		{
-			sleep(1); //zamienić na nanosleep
+			nanosleep(&time1, &time2);
+			//sleep(1);
+
 			childPid = waitid(P_ALL, 0, &status, WNOHANG | WEXITED);
 			if(childPid != -1)
 			{
 				if(status.si_pid != 0)
-					printf("----------\nWŁAŚNIE UMARŁ POTOMEK\npid zamordowanego potomka: %d\nstatus zamordowanego: %d\nprzyczyna śmierci: %d\nNiech odpoczywa w pokoju\n----------\n\n", status.si_pid, status.si_status, status.si_code);
-				i++;
+				{
+					printf("----------\nWŁAŚNIE UMARŁ POTOMEK\npid zamordowanego potomka: %d\nstatus zamordowanego: %d\nprzyczyna śmierci: %d\n[*] REQUIESCAT IN PACE [*]\n----------\n\n", status.si_pid, status.si_status, status.si_code);
+					i++;
+				}
+				//else
+					//fprintf(stderr, "Could not read child's status");
+				//i++;
 			}
-
 		}
+		//stderr
 	}
 
 	return 0;
