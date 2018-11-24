@@ -7,19 +7,27 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <time.h>
+#include <errno.h>
+#include <sys/wait.h>
 
 int main(int argc, char* argv[])
 {
 	int c;
-	char* pathToProgram;
+	//char pathToProgram1[20];
+	char* pathToProgram1 = NULL;
+	//memset(pathToProgram1, 0, sizeof(pathToProgram1)/sizeof(char));
+	char* pathToProgram2 = NULL;
 
 	while((c=getopt(argc, argv, "p:c:")) != -1)
 		switch(c)
 		{
 			case 'p':
+				pathToProgram2 = optarg;
 				 break;
 			case 'c':
-				 pathToProgram = optarg;
+				 pathToProgram1 = optarg;
+				 //strcpy(pathToProgram1, optarg);
+				 printf("%s", pathToProgram1);
 				break;
 			case '?':
 				printf("Wrong usage of parametes, try -c <path_to_program.out>\n");
@@ -30,18 +38,24 @@ int main(int argc, char* argv[])
 	int idx = optind;
 	//pid kolejnego potomka, pgid całej grupy potomków
 	pid_t pid, pgid = 0;
+	int childrenNumber = 0;
+	float childrenMin = 0;
 
 	//TODO: Rozbić na osobną funckję
 	while(argv[idx] != NULL)
 	{
 		//odczytuje argv[optdind] i go przetwarzam -> tworzę potomka etc
 		char* pEnd;
-		float var = strtod(argv[idx], &pEnd);
+		float floatVar = strtod(argv[idx], &pEnd);
 		if(*pEnd != '\0')
 		{
 			printf("Parametr argv[%d] = %s nie jest floatem i nie będzie procesowany!\n", idx, argv[idx]);
 			break;
 		}
+		//liczymy który to potomek i sprawdzamy, czy jest min
+		childrenNumber++;
+		if(floatVar < childrenMin || childrenNumber == 1)
+			childrenMin = floatVar;
 
 		//jeżeli mamy parametr c to robimy execa
 		//jeżeli nie to idziemy dalej, na razie idziemy dalej
@@ -62,11 +76,16 @@ int main(int argc, char* argv[])
 		{
 			//procesujemy jeżeli było obecne -c CZYLI mamy scieżkę do pliku i wywołujemy
 			//go z parametrem <float> który coś tam robi sobie
-			if(pathToProgram)
+			if(pathToProgram1)
 			{
-				char* fakeArgv[] = { pathToProgram, argv[idx], NULL }; //tworzymy argumenty dla naszego
+				char* fakeArgv[] = { pathToProgram1, argv[idx], NULL }; //tworzymy argumenty dla naszego
 				//execa włącznie z nazwą, która zawsze znajduje się na [0] miejscu
-				int exe = execvp(pathToProgram, fakeArgv); //wywołanie execa
+				int exe = execv(pathToProgram1, fakeArgv); //wywołanie execa
+				if(exe == -1)
+				{
+						printf("Nie powiodło się");
+						printf("ERRNO: %d\n", errno);
+				}
 
 				return 0;
 			}
@@ -76,10 +95,9 @@ int main(int argc, char* argv[])
 			{
 				struct timespec time1, time2;
 				time1.tv_sec = 1 ;
-				long int nsecL = strtol(argv[idx], NULL, 0);
 				//if((nsecL*10000000L)>1000000000L)
-				nsecL *= 10000000L;
-				time1.tv_nsec = nsecL;
+				floatVar *= 10000000L;
+				time1.tv_nsec = floatVar;
 
 				nanosleep(&time1, &time2);
 				printf("Wyspany!\n");
@@ -91,12 +109,67 @@ int main(int argc, char* argv[])
 
 				return random;
 			}
-			return 0;
+			return 0; //to chyba nie jest tutaj potrzebne
+		
 		}
-			
-	
-
-
+		
+		//rodzic nie robi nic, poza inkrementowaniem pętli towrzenia się potomków
 		idx++;
+}
+
+	//DOGLĄDANIE POTOMKÓW
+
+	//1. jeśli był podany parametr -p
+	if(pathToProgram2 != NULL)
+		{
+		//potrzebujemy:
+		//->PID grupy procesów na str
+		char strPgid[10];
+		memset(strPgid, 0, sizeof(strPgid)/sizeof(char));
+		sprintf(strPgid, "%d", pgid);
+
+		//->ilość utworzonych potomków na str
+		char childrenNumberStr[10];
+		memset(childrenNumberStr, 0, sizeof(childrenNumberStr)/sizeof(char));	
+		sprintf(childrenNumberStr, "%d", childrenNumber);
+
+		//->-t wartość najmniejszego z nich
+		char childrenMinStr[10];
+		memset(childrenMinStr, 0, sizeof(childrenMinStr)/sizeof(char));	
+		sprintf(childrenMinStr, "%f", childrenMin);
+
+		char* fakeArgv[] = {pathToProgram2,"-t", childrenMinStr, childrenNumberStr, strPgid, NULL }; //tworzymy argumenty dla naszego
+
+		int exe = execv(pathToProgram2, fakeArgv); //wywołanie execa
+		if(exe == -1)
+			printf("Odpalenie programu2 nie powiodło się, errno = %d\n", errno);
+
+		return 0;
+		}
+
+	else	//kiedy nie mamy ścieżki do pliku
+	{
+		pid_t childPid = -1;
+		siginfo_t status;
+
+		//definiujemy sobie naszą kolejną strukturę czasu
+		
+		//sleep(3);
+		int i = 0;
+		while(i != childrenNumber)
+		{
+			sleep(1); //zamienić na nanosleep
+			ifchildPid = waitid(P_PID, pid, &status, WNOHANG | WEXITED);
+		}
+
+		printf("RIP\npid zamordowanego potomka: %d\nstatus zamordowanego: %d\nprzyczyna śmierci: %d\nNiech odpoczywa w pokoju\n", pid, status.si_status, status.si_code);
+
+		
+
+	
 	}
+
+	//idx++;
+//} //zamknięcie while'a
+
 }
