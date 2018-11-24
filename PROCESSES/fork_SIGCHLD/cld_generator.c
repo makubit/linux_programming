@@ -10,6 +10,8 @@
 #include <errno.h>
 #include <sys/wait.h>
 
+#define NANOSEC 1000000000L
+
 int main(int argc, char* argv[])
 {
 	int c;
@@ -94,10 +96,8 @@ int main(int argc, char* argv[])
 			else 
 			{
 				struct timespec time1, time2;
-				time1.tv_sec = 1 ;
-				//if((nsecL*10000000L)>1000000000L)
-				floatVar *= 10000000L;
-				time1.tv_nsec = floatVar;
+				time1.tv_sec = floatVar / NANOSEC;
+				time1.tv_nsec = (long)(floatVar*NANOSEC) % NANOSEC;
 
 				nanosleep(&time1, &time2);
 				printf("Wyspany!\n");
@@ -115,7 +115,7 @@ int main(int argc, char* argv[])
 		
 		//rodzic nie robi nic, poza inkrementowaniem pętli towrzenia się potomków
 		idx++;
-}
+	} //KONIEC WHILE'A
 
 	//DOGLĄDANIE POTOMKÓW
 
@@ -138,7 +138,7 @@ int main(int argc, char* argv[])
 		memset(childrenMinStr, 0, sizeof(childrenMinStr)/sizeof(char));	
 		sprintf(childrenMinStr, "%f", childrenMin);
 
-		char* fakeArgv[] = {pathToProgram2,"-t", childrenMinStr, childrenNumberStr, strPgid, NULL }; //tworzymy argumenty dla naszego
+		char* fakeArgv[] = { pathToProgram2,"-t", childrenMinStr, childrenNumberStr, strPgid, NULL }; //tworzymy argumenty dla naszego
 
 		int exe = execv(pathToProgram2, fakeArgv); //wywołanie execa
 		if(exe == -1)
@@ -153,23 +153,26 @@ int main(int argc, char* argv[])
 		siginfo_t status;
 
 		//definiujemy sobie naszą kolejną strukturę czasu
+		struct timespec time1, time2;
+		time1.tv_sec = (childrenMin / 2) / NANOSEC;
+		time1.tv_nsec = (long)((childrenMin/2) * NANOSEC) % NANOSEC;
+
+		nanosleep(&time1, &time2);
 		
-		//sleep(3);
 		int i = 0;
-		while(i != childrenNumber)
+		while(i < childrenNumber)
 		{
 			sleep(1); //zamienić na nanosleep
-			ifchildPid = waitid(P_PID, pid, &status, WNOHANG | WEXITED);
+			childPid = waitid(P_ALL, 0, &status, WNOHANG | WEXITED);
+			if(childPid != -1)
+			{
+				if(status.si_pid != 0)
+					printf("----------\nWŁAŚNIE UMARŁ POTOMEK\npid zamordowanego potomka: %d\nstatus zamordowanego: %d\nprzyczyna śmierci: %d\nNiech odpoczywa w pokoju\n----------\n\n", status.si_pid, status.si_status, status.si_code);
+				i++;
+			}
+
 		}
-
-		printf("RIP\npid zamordowanego potomka: %d\nstatus zamordowanego: %d\nprzyczyna śmierci: %d\nNiech odpoczywa w pokoju\n", pid, status.si_status, status.si_code);
-
-		
-
-	
 	}
 
-	//idx++;
-//} //zamknięcie while'a
-
+	return 0;
 }
