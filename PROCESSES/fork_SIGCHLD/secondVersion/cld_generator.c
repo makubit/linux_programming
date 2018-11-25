@@ -65,7 +65,7 @@ int main(int argc, char* argv[])
 		/* Set group id if it was not set previously, otherwise get existing group id */
 		if(!pgid)
 		{
-			int setP = setpgid(pid, 0); //TODO: Check validity
+			int setP = setpgid(pid, 0);
 			if(setP == -1)
 				printf("Setpgid error\n");
 
@@ -134,7 +134,7 @@ int main(int argc, char* argv[])
 		memset(childMinStr, 0, sizeof(childMinStr)/sizeof(char));	
 		sprintf(childMinStr, "%f", childMin);
 
-		char* fakeArgv[] = { pathToProgram2,"-t", childMinStr, childrenNumberStr, strPgid, NULL }; /* Make args for second program */
+		char* fakeArgv[] = { pathToProgram2,"-t", childMinStr, strPgid, childrenNumberStr, NULL }; /* Make args for second program */
 
 		int exe = execv(pathToProgram2, fakeArgv); /* Execure second program */
 		if(exe == -1)
@@ -161,7 +161,7 @@ int main(int argc, char* argv[])
 			if(nano)
 				printf("Can't sleep properly...\n");
 
-			childPid = waitid(P_ALL, 0, &status, WNOHANG | WEXITED);
+			childPid = waitid(P_PGID, pgid, &status, WNOHANG | WEXITED);
 			if(childPid != -1)
 			{
 				if(status.si_pid > 0)
@@ -169,7 +169,7 @@ int main(int argc, char* argv[])
 					printf("\n----------\nCHILD HAS JUST DIEDED\nit's PID: %d\nstatus: %d\ncause of death: %d\n[*] REQUIESCAT IN PACE [*]\n----------\n\n", status.si_pid, status.si_status, status.si_code);
 					i++;
 				}
-				else if(status.si_pid < 0)
+				else if(errno == ECHILD) //(status.si_pid < 0) /* Exclude processes that are not children of calling process */
 					fprintf(stderr, "Could not read child's status");
 			}
 		}
