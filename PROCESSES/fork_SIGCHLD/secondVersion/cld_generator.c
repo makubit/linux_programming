@@ -38,7 +38,7 @@ int main(int argc, char* argv[])
 	int idx = optind; /* Index for generating children */
 	pid_t pid, pgid = 0; /* pid -> for child, pgid -> for group */
 	int childrenNumber = 0;
-	float childrenMin = 0;
+	float childMin = 0;
 
 	/* Main loop for generating children */
 	while(argv[idx] != NULL)
@@ -56,8 +56,8 @@ int main(int argc, char* argv[])
 		childrenNumber++;
 
 		/* Set min value */
-		if(floatVar < childrenMin || childrenNumber == 1)
-			childrenMin = floatVar;
+		if(floatVar < childMin || childrenNumber == 1)
+			childMin = floatVar;
 
 		/* Make a child */
 		pid = fork();
@@ -130,11 +130,11 @@ int main(int argc, char* argv[])
 		memset(childrenNumberStr, 0, sizeof(childrenNumberStr)/sizeof(char));	
 		sprintf(childrenNumberStr, "%d", childrenNumber);
 
-		char childrenMinStr[10]; /* Min float passed as a parameter */
-		memset(childrenMinStr, 0, sizeof(childrenMinStr)/sizeof(char));	
-		sprintf(childrenMinStr, "%f", childrenMin);
+		char childMinStr[10]; /* Min float passed as a parameter */
+		memset(childMinStr, 0, sizeof(childMinStr)/sizeof(char));	
+		sprintf(childMinStr, "%f", childMin);
 
-		char* fakeArgv[] = { pathToProgram2,"-t", childrenMinStr, childrenNumberStr, strPgid, NULL }; /* Make args for second program */
+		char* fakeArgv[] = { pathToProgram2,"-t", childMinStr, childrenNumberStr, strPgid, NULL }; /* Make args for second program */
 
 		int exe = execv(pathToProgram2, fakeArgv); /* Execure second program */
 		if(exe == -1)
@@ -150,8 +150,8 @@ int main(int argc, char* argv[])
 		siginfo_t status;
 
 		struct timespec time1;
-		time1.tv_sec = (long)(childrenMin / 2) / 100;
-		time1.tv_nsec = (long)((childrenMin/2) * NANOSEC/100) % NANOSEC;
+		time1.tv_sec = (long)(childMin / 2) / 100;
+		time1.tv_nsec = (long)((childMin/2) * NANOSEC/100) % NANOSEC;
 		
 		/* Loop for waiting for children's death */
 		int i = 0;
