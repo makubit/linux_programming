@@ -31,7 +31,7 @@ struct chldQueue* queue = NULL;
 struct chldQueue* newItem = NULL;
 struct chldQueue* first  = NULL;
 
-static siginfo_t status;
+int childrenNumber = 0;
 
 /* Define main functions to handle queue */
 /*void push(siginfo_t status)
@@ -66,9 +66,22 @@ void push(siginfo_t status)
 
 
 /* Definfe function to handle signal SIGCHLD */
-static void sigchld_handler(int signo)
+static void sigchld_handler(int signo, siginfo_t* siginfo, void* context)
 {
-		
+	//printf("Jestem w obsłusze syngału!\nLiczba dzieci: %d\n pid: %d, %d\n", childrenNumber, status.si_pid, status.si_code);
+
+	if(siginfo->si_code == CLD_KILLED ) /* Write to queue; 2 == CLDKILLED*/
+	{
+		//push(status);
+		printf("--->------>Jestem w obsłusze syngału!\nLiczba dzieci: %d\n pid: %d\n", childrenNumber, siginfo->si_pid);
+
+		childrenNumber--;
+	}
+
+	//if(childrenNumber == 0)
+	//{
+		//wypisuje flagę -> ALE GDZIE???
+	//}		
 }
 
 //----------------------------------------------------
@@ -93,7 +106,7 @@ int main(int argc, char* argv[])
 		}
 
 	int pgid = 0;
-	int childrenNumber = 0;
+	//int childrenNumber = 0;
 	
 	/* Check if there are two positional parameters */
 	if(!(argv[optind] || argv[optind+1]))
@@ -122,7 +135,7 @@ int main(int argc, char* argv[])
 	/* First part: Wait for children being synchronized */
 	int i = 0;
 	pid_t childPid = -1;
-	//siginfo_t status;
+	siginfo_t status;
 	while(i < childrenNumber)
 	{
 		childPid = waitid(P_PGID, pgid, &status, WNOHANG | WSTOPPED | WEXITED); /* Waiting for stopped or killed children */
@@ -135,17 +148,34 @@ int main(int argc, char* argv[])
 			} //TODO: if cannot read status -> error
 		}
 	}
+
+	/* Create sigaction structure to monitor incoming signals */
+	struct sigaction act;
+	act.sa_sigaction = &sigchld_handler;
+	act.sa_flags = SA_SIGINFO;
+
 	
 	/* Until all children die */
-	// --- //
+	while(childrenNumber > 0)
+	{ 
+		/* Handle SIGCHLD signal */
+		if(status.si_pid > 0)
+			if(sigaction(SIGCHLD, &act, NULL) < 0)
+			{
+				fprintf(stderr, "Cannot handle signal SIGCHLD\n");
+				return -1;
+			}
+
+		/* Wake up whole group of children */
+		int sendContinue = killpg(pgid, SIGCONT);
+		if(sendContinue)
+			printf("Something went wrong / Sending SIGCONT\n");
+		
+		/* Passive waiting ??????? */
 	
-	/* Handle SIGCHLD signal */
-	if(signal(SIGCHLD, sigchld_handler) == SIG_ERR)
-	{
-		fprintf(stderr, "Cannot handle signal SIGCHLD\n");
-		return -1;
+		/* Print which Child has died */	
+
 	}
-	
 
 
 
