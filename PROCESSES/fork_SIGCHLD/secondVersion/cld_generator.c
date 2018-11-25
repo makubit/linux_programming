@@ -65,11 +65,18 @@ int main(int argc, char* argv[])
 		/* Set group id if it was not set previously, otherwise get existing group id */
 		if(!pgid)
 		{
-			setpgid(pid, 0); //TODO: Check validity
+			int setP = setpgid(pid, 0); //TODO: Check validity
+			if(setP == -1)
+				printf("Setpgid error\n");
+
 			pgid = getpgid(pid);
 		}
 		else
-			setpgid(pid, pgid);
+		{
+			int setP = setpgid(pid, pgid);
+			if(setP == -1)
+				printf("Setpgid error\n");
+		}
 		
 		/* Process if it is child */
 		if(pid == 0) 
@@ -92,7 +99,9 @@ int main(int argc, char* argv[])
 				time1.tv_sec = floatVar / 100;
 				time1.tv_nsec = (long)(floatVar * NANOSEC / 100) % NANOSEC;
 
-				nanosleep(&time1, NULL);
+				int nano = nanosleep(&time1, NULL);
+				if(nano)
+					printf("Can't sleep properly...\n");
 				
 				/* Generate random number in range <0, 127> */
 				srand(time(0));
@@ -148,18 +157,20 @@ int main(int argc, char* argv[])
 		int i = 0;
 		while(i < childrenNumber)
 		{
-			nanosleep(&time1, NULL);
+			int nano = nanosleep(&time1, NULL);
+			if(nano)
+				printf("Can't sleep properly...\n");
 
 			childPid = waitid(P_ALL, 0, &status, WNOHANG | WEXITED);
 			if(childPid != -1)
 			{
-				if(status.si_pid != 0)
+				if(status.si_pid > 0)
 				{
 					printf("\n----------\nCHILD HAS JUST DIEDED\nit's PID: %d\nstatus: %d\ncause of death: %d\n[*] REQUIESCAT IN PACE [*]\n----------\n\n", status.si_pid, status.si_status, status.si_code);
 					i++;
 				}
-				//else
-					//fprintf(stderr, "Could not read child's status");
+				else if(status.si_pid < 0)
+					fprintf(stderr, "Could not read child's status");
 			}
 		}
 	}
