@@ -12,9 +12,6 @@
 #include <sys/wait.h>
 #include <math.h>
 
-/* Define flags */
-#define NOMORECHLD FALSE
-
 /* Define child Queue*/
 struct chldQueue
 {
@@ -22,23 +19,15 @@ struct chldQueue
    struct chldQueue* next; /* pointer to next item */
 };
 
-/*struct chldQueue
-{
-   struct chldQueueItem pHead;
-   struct chldQueueItem pTail;
-};*/
-
-//static struct chldQueue queue;
-
 /* Create our queue */
 struct chldQueue* queue = NULL;
 struct chldQueue* newItem = NULL;
 struct chldQueue* first  = NULL;
 
+/* Variables and counters to control signals */
 static volatile int childrenNumber = 0;
 static volatile int childrenNumberDeadOrAlive = 0;
 int pgid;
-/* Flag to set when there are no more alive children */
 
 /* Functions to manage queue */
 void push(siginfo_t status)
@@ -59,7 +48,7 @@ void pop()
       newItem = (*first).next;
 
       /* Print obituary */
-      printf("\n----------\nCHILD HAS JUST DIEDED\nit's PID: %d\nstatus: %d\ncause of death: %d\n[*] REQUIESCAT IN PACE [*]\n\n", first->status.si_pid, first->status.si_status, first->status.si_code);
+      printf("\n\n--------------------\nCHILD HAS JUST DIEDED\nit's PID: %d\nstatus: %d\ncause of death: %d\n[*] REQUIESCAT IN PACE [*]\n--------------------\n\n", first->status.si_pid, first->status.si_status, first->status.si_code);
       
       free(first);
       first = newItem;
@@ -70,20 +59,16 @@ void pop()
            printf("Queue is empty, cannot pop...\n");
 }
 
-
 /* Definfe function to handle signal SIGCHLD */
 static void sigchld_handler(int signo, siginfo_t* status, void* context)
 {
-  printf("\n\n\n...\n");
    siginfo_t status2;
-   pid_t childPid;
-   //printf("--->%d<----%d::%d\n\n%d\n\n",status->si_pid, getpgid(status->si_pid), pgid, status->si_code);
-   while(!waitid(P_PGID, pgid, &status2, WNOHANG | WCONTINUED | WEXITED | WSTOPPED)) /* waitid() i używamy statusu z waitID to to się zmienia, a to w parametrze jest stałe */
+   while(!waitid(P_PGID, pgid, &status2, WNOHANG | WCONTINUED | WEXITED | WSTOPPED)) /* Wait works until there is no more signals incoming */
    {
       if(status2.si_code == CLD_KILLED)
       {
          push(status2); /* Push new obituary when is dead */
-         printf("--->------>Jestem w obsłusze syngału!\nLiczba dzieci: %d\n pid: %d\n", childrenNumber, status2.si_pid);
+         printf("\nEND IS SOON FOR CHILD NUMBER . . . %d\n", status2.si_pid);
 
          childrenNumber--;
          childrenNumberDeadOrAlive--;
@@ -92,27 +77,26 @@ static void sigchld_handler(int signo, siginfo_t* status, void* context)
       else if(status2.si_code == CLD_STOPPED)
       {
         childrenNumberDeadOrAlive--;
-        printf("Obsługa sygnału stopped\t");
+        printf("\nJust stopping signal no %d \n", status2.si_pid);
 
       }
 
       else if(status2.si_code == CLD_CONTINUED)
       {
          childrenNumberDeadOrAlive++;
-         printf("Obsługa sygnału continued\t%d", childrenNumberDeadOrAlive);
+         printf("\nWaking up child no %d\n", status2.si_pid);
 
       }
-      else if(status2.si_code == CLD_EXITED)
-      {childrenNumberDeadOrAlive--;
-        childrenNumber--;
-      }
-      else break;
+      
+      else 
+        break;
+
      }
-      //if(childrenNumber == 0)
-           //printf("Nie ma więcej żywych dzieci\n");}
-      //return;
-      }
+ }
+
 //----------------------------------------------------
+//----------------------------------------------------
+
 int main(int argc, char* argv[])
 {
    int c;
@@ -148,7 +132,7 @@ int main(int argc, char* argv[])
    }
 
    childrenNumber = strtol(argv[optind+1], &pEnd, 0);
-   childrenNumberDeadOrAlive = 0;
+   childrenNumberDeadOrAlive = 0; /* Incoming children are sleeping */
    if(*pEnd)
    {
       printf("Parameter has to be a int number, try again...\n");
@@ -167,7 +151,9 @@ int main(int argc, char* argv[])
       if(childPid != -1)
       {
          if(status.si_pid > 0)
-            i++; //TODO: if cannot read status -> error
+            i++;
+         else if(status.si_pid < 0)
+           perror("Cannot synchronize child\n");
       }
    }
 
@@ -180,63 +166,48 @@ int main(int argc, char* argv[])
    /* Handle SIGCHLD signal */
    if(sigaction(SIGCHLD, &act, NULL) < 0)
    {
-     perror("reg.signal");
+     perror("Cannot handle SIGCHLD...\n");
      return -1;
    }
 
    /* Wake up whole group of children */ // -->> TODO: IF NO MORE ALIVE AT START in case -c parameter was not passed in first program!
+   //if(
    int sendContinue = killpg(pgid, SIGCONT);
    if(sendContinue)
       printf("Something went wrong / Sending SIGCONT\n");
 
-   /* Until all children die */
+   /*
+    *    Until all children die
+    */
+
+
    while(childrenNumber > 0)
    { 
       /* Passive waiting */
       pause();
-      //sigwaitinfo(&block, &info);
-      //sigsuspend(&info);
-      
 
-      /* Print which Child has died -> next loop */
+      /* Print which Child has died */
       while(queue)
          pop();
 
-      /* if no more alive and -> managed by while loop */
-      /* if no more active chld -> childrenNumber == 0 -> werid nanosleep, then wake up chld */
+      /* If no more awaken BUT still alive */
       if((childrenNumberDeadOrAlive == 0) && (childrenNumber > 0))
       {
-         printf("!!!!!!!!!!!Sleeping...\n");
-         sleep(2);
+         printf("\nAll children are sleeping right now...\n");
+         sleep(2); //TODO: mathhh piii
 
          /* Wake up all children */
          int sendContinue = killpg(pgid, SIGCONT);
          if(sendContinue)
-            printf("Something went wrong / Sending SIGCONT\n");
-
-         sleep(2);
+            printf("Something went wrong (sending SIGCONT)\n");
       }
 
-      //pause();
+      /* Print counters */
+      printf("\n>>COUNTERS:\n>>children alive: [%d]\tchildren sleeping: [%d]\n", childrenNumber, childrenNumberDeadOrAlive);
 
-     // while(queue)
-        //pop();
-
-      /* if chl > 0 continue while loop */ 
-      printf("Waiting....\n");
-      //sleep(5);
-
-      printf("%d<<>>%d\n\n", childrenNumber, childrenNumberDeadOrAlive);
    }
 
-
-
-
-
-
-   return 0;
-   
-   
+   return 0; 
    
 }
 
