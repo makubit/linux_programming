@@ -14,4 +14,4 @@ getopt_exercises/
 *.swn
 *.swk
 *.swo
-
+*.c.swo
