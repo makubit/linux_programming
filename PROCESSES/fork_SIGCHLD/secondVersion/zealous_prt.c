@@ -74,15 +74,15 @@ void pop()
 /* Definfe function to handle signal SIGCHLD */
 static void sigchld_handler(int signo, siginfo_t* status, void* context)
 {
+  printf("\n\n\n...\n");
    siginfo_t status2;
    pid_t childPid;
-   printf("--->%d<----%d::%d\n\n%d\n\n",status->si_pid, getpgid(status->si_pid), pgid, status->si_code);
-     while(!waitid(P_PGID, pgid, &status2, WNOHANG)) /* waitid() i używamy statusu z waitID to to się zmienia, a to w parametrze jest stałe */
+   //printf("--->%d<----%d::%d\n\n%d\n\n",status->si_pid, getpgid(status->si_pid), pgid, status->si_code);
+   while(!waitid(P_PGID, pgid, &status2, WNOHANG | WCONTINUED | WEXITED | WSTOPPED)) /* waitid() i używamy statusu z waitID to to się zmienia, a to w parametrze jest stałe */
    {
-      printf("Obsługa sygnału góra\t");
       if(status2.si_code == CLD_KILLED)
       {
-         push(status2); /* Push new obituary when is dead */ //???????????????????
+         push(status2); /* Push new obituary when is dead */
          printf("--->------>Jestem w obsłusze syngału!\nLiczba dzieci: %d\n pid: %d\n", childrenNumber, status2.si_pid);
 
          childrenNumber--;
@@ -102,13 +102,16 @@ static void sigchld_handler(int signo, siginfo_t* status, void* context)
          printf("Obsługa sygnału continued\t%d", childrenNumberDeadOrAlive);
 
       }
-
-      else if(childrenNumber == 0)
-              printf("Nie ma więcej żywych dzieci\n");
-
-   }     
-}
-
+      else if(status2.si_code == CLD_EXITED)
+      {childrenNumberDeadOrAlive--;
+        childrenNumber--;
+      }
+      else break;
+     }
+      //if(childrenNumber == 0)
+           //printf("Nie ma więcej żywych dzieci\n");}
+      //return;
+      }
 //----------------------------------------------------
 int main(int argc, char* argv[])
 {
@@ -128,9 +131,6 @@ int main(int argc, char* argv[])
             printf("Wrong usage of parametes, try -t <float>\n");
             break;
       }
-
-   //int pgid = 0;
-   //int childrenNumber = 0;
    
    /* Check if there are two positional parameters */
    if(!(argv[optind] || argv[optind+1]))
@@ -148,7 +148,7 @@ int main(int argc, char* argv[])
    }
 
    childrenNumber = strtol(argv[optind+1], &pEnd, 0);
-   childrenNumberDeadOrAlive = childrenNumber;
+   childrenNumberDeadOrAlive = 0;
    if(*pEnd)
    {
       printf("Parameter has to be a int number, try again...\n");
@@ -167,37 +167,25 @@ int main(int argc, char* argv[])
       if(childPid != -1)
       {
          if(status.si_pid > 0)
-         {
-            printf("Synchronizuję potomka: %d\n", status.si_pid);
-            i++;
-         } //TODO: if cannot read status -> error
+            i++; //TODO: if cannot read status -> error
       }
    }
 
    /* Create sigaction structure to monitor incoming signals */
    struct sigaction act;
-   //act.sa_handler = sigchld_handler;
-   //!!
    sigemptyset(&act.sa_mask);
-   //act.sa_handler = sigchld_handler;
    act.sa_sigaction = &sigchld_handler;
    act.sa_flags = SA_SIGINFO;
-   //sigset_t emptyMask, blockMask;
 
    /* Handle SIGCHLD signal */
    if(sigaction(SIGCHLD, &act, NULL) < 0)
    {
      perror("reg.signal");
-     //fprintf(stderr, "Cannot handle signal SIGCHLD\n");
      return -1;
    }
-   //sigemptyset(&blockMask);
-   //sigaddset(&blockMask, SIGCHLD);
-   //sigprocmask(SIG_SETMASK, &blockMask, NULL);
 
-   /* Wake up whole group of children */
+   /* Wake up whole group of children */ // -->> TODO: IF NO MORE ALIVE AT START in case -c parameter was not passed in first program!
    int sendContinue = killpg(pgid, SIGCONT);
-   sleep(5);
    if(sendContinue)
       printf("Something went wrong / Sending SIGCONT\n");
 
@@ -206,6 +194,9 @@ int main(int argc, char* argv[])
    { 
       /* Passive waiting */
       pause();
+      //sigwaitinfo(&block, &info);
+      //sigsuspend(&info);
+      
 
       /* Print which Child has died -> next loop */
       while(queue)
@@ -222,7 +213,14 @@ int main(int argc, char* argv[])
          int sendContinue = killpg(pgid, SIGCONT);
          if(sendContinue)
             printf("Something went wrong / Sending SIGCONT\n");
+
+         sleep(2);
       }
+
+      //pause();
+
+     // while(queue)
+        //pop();
 
       /* if chl > 0 continue while loop */ 
       printf("Waiting....\n");
