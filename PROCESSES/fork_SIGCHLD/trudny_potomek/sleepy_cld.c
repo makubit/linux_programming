@@ -46,7 +46,7 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 
-	//printf("Sending SIGSTOP\nTo continue type in terminal: kill -SIGCONT %d\n", getpid());
+	printf("\n>>sleepy: Sending SIGSTOP\nTo continue type in terminal: kill -SIGCONT %d\n", getpid());
 	raise(SIGSTOP); /* At first stop, than after proper command in terminal process remaining code */
 
 	char* pEnd = NULL;
@@ -71,7 +71,6 @@ int main(int argc, char* argv[])
 			printf("Nanosleep returned value != 0\n");
 
 		raise(randSignal());
-		//printf("Continue...\n");
 	}
 
 
