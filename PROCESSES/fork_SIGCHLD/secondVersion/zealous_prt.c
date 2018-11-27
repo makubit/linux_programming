@@ -12,6 +12,8 @@
 #include <sys/wait.h>
 #include <math.h>
 
+#define NANOSEC 10000000000L
+
 /* Define child Queue*/
 struct chldQueue
 {
@@ -139,8 +141,6 @@ int main(int argc, char* argv[])
       return -1;
    }
 
-   printf("->%d, %d, %f\n", pgid, childrenNumber, floatVar);
-
    /* First part: Wait for children being synchronized */
    int i = 0;
    pid_t childPid = -1;
@@ -170,11 +170,13 @@ int main(int argc, char* argv[])
      return -1;
    }
 
-   /* Wake up whole group of children */ // -->> TODO: IF NO MORE ALIVE AT START in case -c parameter was not passed in first program!
-   //if(
+   /* Wake up whole group of children */
    int sendContinue = killpg(pgid, SIGCONT);
    if(sendContinue)
-      printf("Something went wrong / Sending SIGCONT\n");
+   {
+      printf("Cannot wake up children\n");
+      return 1;
+   }
 
    /*
     *    Until all children die
@@ -194,7 +196,13 @@ int main(int argc, char* argv[])
       if((childrenNumberDeadOrAlive == 0) && (childrenNumber > 0))
       {
          printf("\nAll children are sleeping right now...\n");
-         sleep(2); //TODO: mathhh piii
+        
+         struct timespec time1;
+         double temp = floatVar * (1/(M_PI*M_PI));
+         time1.tv_sec = (long)temp;
+         time1.tv_nsec = (long)(temp * NANOSEC) % NANOSEC;
+
+         nanosleep(&time1, NULL);
 
          /* Wake up all children */
          int sendContinue = killpg(pgid, SIGCONT);
