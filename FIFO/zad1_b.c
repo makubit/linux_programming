@@ -9,7 +9,23 @@
 #include <time.h>
 #include <string.h>
 
+#define ARRAY_SIZE 16000
+
 //--------------------------------------------
+
+int sameLetters(char* tab)
+{
+   for(int i = 0; i< strlen(tab); i++)
+   {
+      if(tab[i] != tab[0])
+      {
+         printf("letter: %c and %c\n", tab[i], tab[0]);
+         return 1;
+      }
+   }
+
+   return 0;
+}
 
 int main(int argc, char* argv[])
 {
@@ -19,28 +35,48 @@ int main(int argc, char* argv[])
       return 1;
   }
 
-   int fd;
+   int fd; //file descriptior
+   int counter = 1; //for the second block
 
    char* myFifoFile = argv[1];
    mkfifo(myFifoFile, 0666);
 
-   char myCharArray[16000];
-   memset(myCharArray, 0, sizeof(myCharArray));
+   char myCharArray1[ARRAY_SIZE];
+   char myCharArray2[ARRAY_SIZE];
+   memset(myCharArray1, 0, sizeof(myCharArray1));
+   memset(myCharArray2, 0, sizeof(myCharArray2));
 
-   while(1)
+   fd = open(myFifoFile, O_RDONLY);
+
+   while(fd != EOF)
    {
-      fd = open(myFifoFile, O_RDONLY);
-      read(fd, myCharArray, sizeof(myCharArray));
-      close(fd);
+      read(fd, myCharArray1, sizeof(myCharArray1));
 
-      printf("Reading from fifo: \n%s\n\n", myCharArray);
+      printf("Reading from fifo: \n%c\n\n", myCharArray1[0]);
+
+      /* Check of there are the same letters in block */
+      if(sameLetters(myCharArray1))
+         perror("There are not the same letters...\n");
+
+      /* Chceck if previus block is the same */
+      if(counter % 2)
+         strcpy(myCharArray2, myCharArray1);
+      else
+      {
+         int same = strcmp(myCharArray1, myCharArray2);
+         if(!same)
+            perror("Previous block is not the same\n");
+      }
 
       struct timespec time;
-      time.tv_sec = 1;
+      time.tv_sec = 2;
       time.tv_nsec = 600000000;
       nanosleep(&time, NULL);
+
+      counter++;
    }
 
+   close(fd);
 
-
+   return 0;
 }

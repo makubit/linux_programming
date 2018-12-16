@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <sys/types.h>
 #include <time.h>
 #include <string.h>
 
@@ -35,33 +34,30 @@ int main(int argc, char* argv[])
    memset(myCharArray, 0, sizeof(myCharArray));
 
    //mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-   //fd = open(myFifoFile, O_WRONLY);
+   fd = open(myFifoFile, O_WRONLY);
 
-   while(1)
+   while(myChar <= 'Z')
    {
-      printf("%c %ld\n", myChar, sizeof(myChar));
       /* Make a table with character */
       for(int i=0; i<ARRAY_SIZE; i++)
       {
          myCharArray[i] = myChar;
       }
+
       printf("%c...\n\n", myCharArray[ARRAY_SIZE - 1]);
-      printf("%ld\n\n", sizeof(myCharArray)/sizeof(myChar));
    
-      fd = open(myFifoFile, O_WRONLY);
-      printf("check1\n");
+      printf("writing to file...\n");
       write(fd, myCharArray, sizeof(myCharArray));
-      close(fd);
 
       struct timespec time;
       time.tv_sec = 1;
       time.tv_nsec = 200000000;
       nanosleep(&time, NULL);
 
-
       myChar++;
-      
    }
+
+   close(fd);
 
 
    return 0;
