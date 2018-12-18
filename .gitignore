@@ -1,6 +1,6 @@
 # Don't track conctent of this folders:
 getopt_exercises/
-LIBBIF/
+LIBBUF/
 TEST_PARAMETERS/
 
 # Compiled source
