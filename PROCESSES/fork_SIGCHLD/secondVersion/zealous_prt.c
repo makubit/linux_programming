@@ -67,7 +67,7 @@ static void sigchld_handler(int signo, siginfo_t* status, void* context)
    siginfo_t status2;
    while(!waitid(P_PGID, pgid, &status2, WNOHANG | WCONTINUED | WEXITED | WSTOPPED)) /* Wait works until there is no more signals incoming */
    {
-      if(status2.si_code == CLD_KILLED)
+      if((status2.si_code == CLD_KILLED) || (status2.si_code == CLD_EXITED))
       {
          push(status2); /* Push new obituary when is dead */
          printf("\nEND IS SOON FOR CHILD NUMBER . . . %d\n", status2.si_pid);
