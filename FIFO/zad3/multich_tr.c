@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <string.h>
+#include <sys/wait.h>
 
 //----------------------------------------
 
@@ -42,6 +43,76 @@ int main(int argc, char* argv[])
    {
       perror("Parameter -X is mandatory, exiting...\n");
       return 1;
+   }
+
+   /* Prepare pipes */
+   int fd1[2]; //sends input data from parent to child
+   int fd2[2]; //sends edited string from child to parent
+
+   if(pipe(fd1) == -1)
+   {
+      perror("Pipe failed, exiting...\n");
+      return 1;
+   }
+
+   if(pipe(fd2) == -1)
+   {
+      perror("Pipe failed, exiting...\n");
+      return 1;
+   }
+
+   //make a child which will execute tr -d 'letter'
+   pid_t pid = fork();
+   if(pid < 0)
+   {
+      perror("Child failed\n");
+      return 1;
+   }
+
+   if(pid == 0) //child
+   {
+      close(fd1[1]); //writing end
+
+      /* Read string using first pipe */
+      char buff[100];
+      read(fd1[0], buff, 100);
+      printf("%s--> buff inside child\n", buff);
+
+      //NEXT STEP: execute tr -d !!!!!!!!!!
+      char* arguments[] = {"./tr.out", "a", buff, NULL};
+      execv("./tr.out", arguments);
+
+      close(fd1[0]);
+      close(fd2[0]);
+
+      //char* buff2 = "Nowy buff";
+      /* Write result to pipe */
+      write(fd2[1], "nowy buff", 100);
+      close(fd2[1]);
+
+      return 0;
+   }
+   else //parent
+   {
+      close(fd1[0]);
+
+      char buff[100] = "Random Dataaaaaeeee eee";
+
+      /* Write string to process in child */
+      write(fd1[1], buff, 100);
+      close(fd1[1]);
+
+      printf("Waiting for child to process...\n");
+      wait(NULL); // wait for child to process this string
+
+      close(fd2[1]);
+
+      /* Read processed string from second pipe */
+      char buff2[100];
+      read(fd2[0], buff2, 100);
+      printf("PROCESSED STRING RESULT: %s\n\n", buff2);
+      
+      close(fd2[0]);
    }
 
    return 0;
