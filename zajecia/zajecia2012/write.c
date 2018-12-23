@@ -11,7 +11,21 @@
 
 int main(int argc, char* argv[])
 {
-   
+  if(argc != 2)
+  {
+     perror("One parameter is needed\n");
+     return 1;
+  } 
+
+  char* myFifo = argv[1];
+  mkfifo(myFifo, 0666);
+
+  int fd = open(myFifo, O_WRONLY);
+
+  while(1)
+  {
+     write(
+  }
 
    return 0;
 }

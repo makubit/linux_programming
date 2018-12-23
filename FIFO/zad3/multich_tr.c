@@ -79,8 +79,8 @@ int main(int argc, char* argv[])
       printf("%s--> buff inside child\n", buff);
 
       //NEXT STEP: execute tr -d !!!!!!!!!!
-      char* arguments[] = {"./tr.out", "a", buff, NULL};
-      execv("./tr.out", arguments);
+      //char* arguments[] = {"./tr.out", "a", buff, NULL};
+      //execv("./tr.out", arguments);
 
       close(fd1[0]);
       close(fd2[0]);
@@ -103,7 +103,8 @@ int main(int argc, char* argv[])
       close(fd1[1]);
 
       printf("Waiting for child to process...\n");
-      wait(NULL); // wait for child to process this string
+      int status;
+      wait(&status); // wait for child to process this string
 
       close(fd2[1]);
 
