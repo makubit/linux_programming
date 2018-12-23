@@ -52,11 +52,9 @@ int main(int argc, char* argv[])
    /* Prepare pipes */
    int fd1[2]; //sends input data from parent to child
    int fd2[2]; //sends edited string from child to parent
-  // struct pollfd fds[2];
-  // int timeout_msecs = 500;
+   //int fdData;
 
-   
-
+   int fd_data = open(fileWithData, O_RDONLY);
 
    if(pipe(fd1) == -1)
    {
@@ -88,47 +86,80 @@ int main(int argc, char* argv[])
       printf("%s--> buff inside child\n", buff);
 
       //NEXT STEP: execute tr -d !!!!!!!!!!
-      //char* arguments[] = {"./tr.out", "a", buff, NULL};
-      //execv("./tr.out", arguments);
+      int fd_tr1[2];
+      pipe(fd_tr1);
+      int fd_tr2[2];
+      pipe(fd_tr2);
+
+      pid_t chld_pid = fork();
+      if(chld_pid == 0)
+      {
+          /* Close all unused descriptors, than replace fd_tr1[1] with stdin and fd_tr2[0] with stdout */
+          close(fd_tr1[1]);
+          close(fd_tr2[0]);
+          
+          dup2(fd_tr1[0], 0); //replace stdin with input end of pipe
+          dup2(fd_tr2[1], 1); //replace stdout with output end of pipe
+          
+          close(fd_tr1[0]);
+          close(fd_tr2[1]);
+
+          execl("/usr/bin/tr", "/usr/bin/tr", "-d", "a", NULL);
+          
+          exit(0);
+      }
+      else
+      {
+          read(fd_data, buff, 100);
+          //printf("%s", buff);
+          close(fd_tr1[0]);
+          close(fd_tr2[1]);
+
+          write(fd_tr1[1], buff, sizeof(buff));
+          close(fd_tr1[1]);
+
+          read(fd_tr2[0], buff, sizeof(buff));
+          close(fd_tr2[0]);
+
+      }
 
       close(fd1[0]);
       close(fd2[0]);
 
-      //char* buff2 = "Nowy buff";
       /* Write result to pipe */
-      write(fd2[1], "Nowy buff", 100);
+      write(fd2[1], buff, 100);
       close(fd2[1]);
 
       return 0;
    }
    else //parent
    {
-      close(fd1[0]);
+       close(fd1[0]);
 
-      char buff[100] = "Random Dataaaaaeeee eee";
+       char buff[100] = "Random Dataaaaaeeee eee";
 
-      /* Write string to process in child */
-      write(fd1[1], buff, 100);
-      close(fd1[1]);
+       /* Write string to process in child */
+       write(fd1[1], buff, 100);
+       close(fd1[1]);
 
-      printf("Waiting for child to process...\n");
+       printf("Waiting for child to process...\n");
 
-      struct pollfd pollfds;
-      pollfds.fd = fd2[1];
-      pollfds.events = POLLOUT;
+       struct pollfd pollfds;
+       pollfds.fd = fd2[1];
+       pollfds.events = POLLOUT;
 
-      poll(&pollfds, 1, 500);	
+       poll(&pollfds, 1, 500);	
 
-      printf("events: %d, revents: %d\n\n",pollfds.events, pollfds.revents);
+       printf("events: %d, revents: %d\n\n",pollfds.events, pollfds.revents);
 
-      close(fd2[1]);
+       close(fd2[1]);
 
-      /* Read processed string from second pipe */
-      char buff2[100];
-      read(fd2[0], buff2, 100);
-      printf("PROCESSED STRING RESULT: %s\n\n", buff2);
-      
-      close(fd2[0]);
+       /* Read processed string from second pipe */
+       char buff2[100];
+       read(fd2[0], buff2, 100);
+       printf("PROCESSED STRING RESULT: %s\n\n", buff2);
+
+       close(fd2[0]);
    }
 
    return 0;
