@@ -51,7 +51,10 @@ int main(int argc, char* argv[])
     int fd2[2]; //sends edited string from child to parent
     //int fdData;
 
+    char buff2[100];
     int fd_data = open(fileWithData, O_RDONLY);
+    read(fd_data, buff2, sizeof(buff2));
+
     for(int i = 0; i<strlen(characters); i++)
     {
 //        int fd_data = open(fileWithData, O_RDONLY);
@@ -115,15 +118,15 @@ int main(int argc, char* argv[])
 
             else //parent writes and reads from pipes
             {
-                read(fd_data, buff, 100);
-                printf("PARENT CHILD %s", buff);
+                //read(fd_data, buff, 100);
+                printf("PARENT CHILD %s", buff2);
                 close(fd_tr1[0]);
                 close(fd_tr2[1]);
 
                 write(fd_tr1[1], buff, sizeof(buff));
                 close(fd_tr1[1]);
 
-                read(fd_tr2[0], buff, sizeof(buff));
+                read(fd_tr2[0], buff2, sizeof(buff2));
                 close(fd_tr2[0]);
 
             }
@@ -132,7 +135,7 @@ int main(int argc, char* argv[])
             close(fd2[0]);
 
             /* Write result to pipe */
-            write(fd2[1], buff, 100);
+            write(fd2[1], buff2, 100);
             close(fd2[1]);
 
             exit(0);
@@ -142,10 +145,10 @@ int main(int argc, char* argv[])
         {
             close(fd1[0]);
 
-            char buff[100];
+            //char buff[100];
 
             /* Write string to process in child */
-            write(fd1[1], buff, 100);
+            write(fd1[1], buff2, 100);
             close(fd1[1]);
 
             printf("Waiting for child to process...\n");
@@ -161,7 +164,7 @@ int main(int argc, char* argv[])
             close(fd2[1]);
 
             /* Read processed string from second pipe */
-            char buff2[100];
+            //char buff2[100];
             read(fd2[0], buff2, 100);
             printf("PROCESSED STRING RESULT: %s\n\n", buff2);
 
