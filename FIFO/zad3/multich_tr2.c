@@ -29,8 +29,6 @@ int main(int argc, char* argv[])
                 for(int i = 0; i< 10; i++)
                     characters[i] = optarg[i];
                 characters[10] = '\0'; //mark end of string
-
-                //printf("%s, %c\n", characters, optarg[9]);
                 break;
             case 'f':
                 fileWithData = optarg;
@@ -49,29 +47,29 @@ int main(int argc, char* argv[])
     /* Prepare pipes */
     int fd1[2]; //sends input data from parent to child
     int fd2[2]; //sends edited string from child to parent
-    //int fdData;
 
     char buff2[100];
     int fd_data = open(fileWithData, O_RDONLY);
+    
+    /* Read data to process in blocks of 100 bytes*/
     read(fd_data, buff2, sizeof(buff2));
+    //TODO: in final stage read will be inside loop -> we have to read all data, not only 100bytes
+    //probably loop with reading should be inside parent, before he sends data to children to parse
 
     for(int i = 0; i<strlen(characters); i++)
     {
-//        int fd_data = open(fileWithData, O_RDONLY);
-
         if(pipe(fd1) == -1)
         {
-            perror("Pipe failed, exiting...\n");
+            perror("Pipe fd1 failed, exiting...\n");
             return 1;
         }
 
         if(pipe(fd2) == -1)
         {
-            perror("Pipe failed, exiting...\n");
+            perror("Pipe fd2 failed, exiting...\n");
             return 1;
         }
 
-        //TODO: while for children
         printf("NOW PROCESSING CHILD: %c\n", characters[i]);
 
         //make a child which will execute tr -d 'letter'
@@ -89,16 +87,25 @@ int main(int argc, char* argv[])
             /* Read string using first pipe */
             char buff[100];
             read(fd1[0], buff, 100);
-            printf("%s--> buff inside child\n", buff);
 
-            //NEXT STEP: execute tr -d !!!!!!!!!!
+            /* Exec tr -d */
             int fd_tr1[2];
-            pipe(fd_tr1);
+            if(pipe(fd_tr1) == -1)
+            {
+                perror("Pipe fd_tr1 failed, exiting...\n");
+                return 1;
+            }
+
             int fd_tr2[2];
-            pipe(fd_tr2);
+            if(pipe(fd_tr2) == -1)
+            {  
+                perror("Pipe fd_tr2 failed, exiting...\n");
+                return 1;
+            }
 
             pid_t chld_pid = fork();
-            if(chld_pid == 0) //child execute tr -d
+
+            if(chld_pid == 0) //child executes tr -d
             {
                 /* Close all unused descriptors, than replace fd_tr1[1] with stdin and fd_tr2[0] with stdout */
                 close(fd_tr1[1]);
@@ -118,8 +125,6 @@ int main(int argc, char* argv[])
 
             else //parent writes and reads from pipes
             {
-                //read(fd_data, buff, 100);
-                printf("PARENT CHILD %s", buff2);
                 close(fd_tr1[0]);
                 close(fd_tr2[1]);
 
@@ -128,7 +133,6 @@ int main(int argc, char* argv[])
 
                 read(fd_tr2[0], buff2, sizeof(buff2));
                 close(fd_tr2[0]);
-
             }
 
             close(fd1[0]);
@@ -151,22 +155,25 @@ int main(int argc, char* argv[])
             write(fd1[1], buff2, 100);
             close(fd1[1]);
 
-            printf("Waiting for child to process...\n");
-
+            /* Wait for child to be processed */
             struct pollfd pollfds;
             pollfds.fd = fd2[1];
             pollfds.events = POLLOUT;
 
-            poll(&pollfds, 1, 500);	
+            int poll_check = poll(&pollfds, 1, 500);
+            if(poll_check <= 0)
+            {
+                perror("Poll failed, exiting...\n");
+                return 1;
+            }
 
             printf("events: %d, revents: %d\n\n",pollfds.events, pollfds.revents);
 
             close(fd2[1]);
 
             /* Read processed string from second pipe */
-            //char buff2[100];
             read(fd2[0], buff2, 100);
-            printf("PROCESSED STRING RESULT: %s\n\n", buff2);
+            printf("PROCESSED STRING RESULT:\n%s\n\n", buff2);
 
             close(fd2[0]);
         }
