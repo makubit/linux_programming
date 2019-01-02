@@ -14,6 +14,15 @@
 #include <stropts.h>
 #include <sys/select.h>
 
+static volatile int counters[10]; //counters for all children
+static char result1[50];
+static char result2[50];
+
+void displayHelp()
+{
+    printf("How to use this program:\n  -X <letters to process tr -d>\n  -f <file with data>\n  note: data file should contain string data\n\n");
+}
+
 void nosleep()
 {
     struct timespec time;
@@ -51,33 +60,57 @@ int main(int argc, char* argv[])
     if(characters == NULL)
     {
         perror("Parameter -X is mandatory, exiting...\n");
+        displayHelp();
         return 1;
     }
+
+    if(fileWithData == NULL)
+    {
+        perror("No file with data to process, exiting...\n");
+        displayHelp();
+        return 1;
+    }
+
+    /* Make fifo file -> on write end I will send data from all children, on read I use cat to see whats happening */
+    /*mkfifo("fifo", 0666);
+    int fifo_fd = open("fifo", O_WRONLY | O_RDONLY | O_NONBLOCK);
+
+    pid_t mkfifo_pid = fork();
+    if(mkfifo_pid < 0)
+    {
+        perror("fork for mkfifo failed, exiting...\n");
+        return 1;
+    }*/
+
+    //if(mkfifo_pid == 0)
+    //{
+        /* Call system function cat to see what children have processed */
+        //system("cat < fifo");
+        //printf("\e[1;1H\e[2J");
+        //exit(0);
+    //}
+    //for(int i = 0; i< 2*strlen(characters); i++)
+       // write(fifo_fd, "\n", 1);
+
+    /* Rest of the program, open fifo file */
+    //int fifo_fd = open("fifo", O_WRONLY | O_NONBLOCK);
 
     /* Prepare pipes */
     int fd1[2]; //sends input data from parent to child
     int fd2[2]; //sends edited string from child to parent
 
-    char buff2[1];
-    //int fd_data = open(fileWithData, O_RDONLY);
-
-    //SYSTEM CALL TEST
-    //system("cat < fifo");
-    //
-    //
-    //
-    /* Flags for non-blocking reading and writing */
-    //typedef struct fd_set set_flags1, set_flags2;
-
-    //int flags1, flags2;
-
-    /* Read data to process in blocks of 100 bytes*/
-    //read(fd_data, buff2, sizeof(buff2));
-    //
-
-    //TODO: in final stage read will be inside loop -> we have to read all data, not only 100bytes
-    //probably loop with reading should be inside parent, before he sends data to children to parse
-
+    char buff2[1]; //buffor for reading from child
+    int count1= 0;
+    int count2 = 0;
+//    char result1[79];
+    //memset(result, 0, 79);
+    //result[0][0] = '\n';
+    //result[79] = '\n';
+    //result[79*2] = '\n';
+ //   char result2[50];
+//    memset(result2, 0, 50);
+    
+    
     for(int i = 0; i<strlen(characters); i++)
     {
         if(pipe(fd1) == -1)
@@ -92,38 +125,7 @@ int main(int argc, char* argv[])
             return 1;
         }
 
-        /* Set nonblocking */
-        //FD_SET(fd1[0], set_flags1);
-        /*flags1 = fcntl(fd1[0], F_GETFL);
-          if(flags1 == -1)
-          perror("fcntl flags error\n");
-
-        //FD_SET(fd2[0], &set_flags2);
-        flags2 = fcntl(fd2[0], F_GETFL);
-        if(flags2 == -1)
-        perror("fcntl flags error\n");
-
-        flags1 |= O_NONBLOCK;
-        flags2 |= O_NONBLOCK;
-
-        int check_fcntl = fcntl(fd1[0], F_SETFL, flags1);
-        //check
-        check_fcntl = fcntl(fd2[0], F_SETFL, flags2);
-        //check
-
-        flags1 = fcntl(fd1[1], F_GETFL);
-        flags2 = fcntl(fd2[1], F_GETFL);
-        //check
-        //
-
-        flags1 |= O_NONBLOCK;
-        flags2 |= O_NONBLOCK;
-
-        check_fcntl = fcntl(fd1[1], F_SETFL, flags1);
-        check_fcntl = fcntl(fd2[1], F_SETFL, flags2);*/
-
-
-        printf("NOW PROCESSING CHILD: %c\n", characters[i]);
+        //printf("NOW PROCESSING CHILD: %c\n", characters[i]);
 
         //make a child which will execute tr -d 'letter'
         pid_t pid = fork();
@@ -185,13 +187,56 @@ int main(int argc, char* argv[])
                     write(fd_tr1[1], buff, sizeof(buff));
                     close(fd_tr1[1]);
 
-                    read(fd_tr2[0], buff2, sizeof(buff2));
+                    char buff_temp[2] = {""};
+                    if(read(fd_tr2[0], buff_temp, 2) > 0) //check if there is newletter
+                        strcpy(buff2, buff_temp);
+
                     close(fd_tr2[0]);
                 }
 
                 /* Write result to pipe */
                 write(fd2[1], buff2, 1);
+
+                if(i == 0)
+                {   
+                    result1[count1]=buff2[0];
+                    //result2[0] = '\n';
+                    count1++;}
+                else
+                {
+                    //result1[0] = '\n';
+                    result2[count2] = buff2[0];
+                    count2++;
+                }
+                    //count2++;
+
+                //printf("\ec");
+                //printf("%s\n%s\n", result1, result2);
+                //printf("\n%s\n", result2);
+                //}
+                
+                
+
+
+                //char ch = "";
+                //while((ch = getc(fifo_fd)) != "\n"
+//write(fifo_fd, "\n", 1);
+
+                //close(fifo_fd);
+                //int nfifo_fd = open("fifo", O_RDONLY | O_WRONLY | O_NONBLOCK);
+                //lseek(fifo_fd, 20, SEEK_SET);
+                //write(fifo_fd, buff2, 1);
+
+                //printf("check");
+                //char ch[1];
+                //read(fifo_fd, ch, 1);
+                //while(ch != EOF)
+                //{
+                    //read(fifo_fd, ch, 1);
+                    //if(ch == "\n")
+                        //write(fifo_fd, buff2, 1);
             
+            //}
             } //while
 
             close(fd1[0]);
@@ -210,6 +255,22 @@ int main(int argc, char* argv[])
         {
             int fd_data = open(fileWithData, O_RDONLY | O_NONBLOCK);
 
+            pid_t try = fork();
+            if(try == 0)
+            {
+                int o = 0;
+                while(o != 10)
+                {
+                    nosleep();
+printf("\ec");
+                printf("%s\n%s\nend", result1, result2);
+                o++;
+
+                }
+                exit(0);
+
+            }
+
             while( read(fd_data, buff2, 1) > 0 ) //while we can read data from file
             {
                 /* Write string to process in child */
@@ -218,7 +279,7 @@ int main(int argc, char* argv[])
                 /* Wait for child to be processed */
                 struct pollfd pollfds;
                 pollfds.fd = fd2[1];
-                pollfds.events = POLLOUT | O_NONBLOCK;
+                pollfds.events = POLLOUT;
 
                 int poll_check = poll(&pollfds, 1, 500);
                 if(poll_check <= 0)
@@ -233,7 +294,16 @@ int main(int argc, char* argv[])
                 nosleep(); //sleep for 3/4sec
 
                 read(fd2[0], buff2, 1);
-                printf("%s\n", buff2);
+                //write(fifo_fd, buff2, 1);
+                //if(i==0) result1[0] = buff2[0];
+                //else result2[0] = buff2[0];
+                //printf("\ec");
+                //printf("%s\n%s\nend", result1, result2);
+
+                /*result[0] = buff2[0];
+ printf("\ec");
+                printf("\n%s\n", result);
+                printf("%s", result2);*/
 
             }
             exit(0);
