@@ -52,7 +52,7 @@ int main(int argc, char* argv[])
     int fd_data = open(fileWithData, O_RDONLY);
     
     /* Read data to process in blocks of 100 bytes*/
-    read(fd_data, buff2, sizeof(buff2));
+    //read(fd_data, buff2, sizeof(buff2));
     //TODO: in final stage read will be inside loop -> we have to read all data, not only 100bytes
     //probably loop with reading should be inside parent, before he sends data to children to parse
 
@@ -148,8 +148,8 @@ int main(int argc, char* argv[])
         else //parent
         {
             close(fd1[0]);
-
-            //char buff[100];
+            
+            read(fd_data, buff2, sizeof(buff2));
 
             /* Write string to process in child */
             write(fd1[1], buff2, 100);
