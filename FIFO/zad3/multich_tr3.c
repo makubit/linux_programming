@@ -109,6 +109,10 @@ int main(int argc, char* argv[])
     //result[79*2] = '\n';
  //   char result2[50];
 //    memset(result2, 0, 50);
+
+    //wyczysc caly ekran
+    printf("\ec");
+
     
     
     for(int i = 0; i<strlen(characters); i++)
@@ -192,12 +196,17 @@ int main(int argc, char* argv[])
                         strcpy(buff2, buff_temp);
 
                     close(fd_tr2[0]);
+                    //exit(0);
                 }
 
+                //int line = 2*i + 2;
+                //printf("\e[%d;0H%c", 2*i + 2, buff[0]);
+            //}
                 /* Write result to pipe */
                 write(fd2[1], buff2, 1);
+                printf("%c\n", buff2[0]);
 
-                if(i == 0)
+                /*if(i == 0)
                 {   
                     result1[count1]=buff2[0];
                     //result2[0] = '\n';
@@ -207,13 +216,24 @@ int main(int argc, char* argv[])
                     //result1[0] = '\n';
                     result2[count2] = buff2[0];
                     count2++;
-                }
+                }*/
                     //count2++;
 
                 //printf("\ec");
                 //printf("%s\n%s\n", result1, result2);
                 //printf("\n%s\n", result2);
                 //}
+                //
+                /*******************************************************
+                 *  TRYING CONSOLE_CODES
+                 */
+                
+                //printf("\e[2J");
+                //printf("tekst\ntest\ntekst\n");
+                ////int line = 2*i + 2;
+                ////printf("\e[%d;0H%c", 2*i + 2, buff[0]);//, buff2[0]);
+                //printf("%c", buff[0]);
+                //printf("helo");
                 
                 
 
@@ -250,12 +270,12 @@ int main(int argc, char* argv[])
         close(fd1[0]);
 
         /* Fork for sending data to all children at the same time */
-        pid_t for_data = fork();
-        if(for_data == 0)
-        {
+        //pid_t for_data = fork();
+        //if(for_data == 0)
+        //{
             int fd_data = open(fileWithData, O_RDONLY | O_NONBLOCK);
 
-            pid_t try = fork();
+            /*pid_t try = fork();
             if(try == 0)
             {
                 int o = 0;
@@ -269,7 +289,7 @@ printf("\ec");
                 }
                 exit(0);
 
-            }
+            }*/
 
             while( read(fd_data, buff2, 1) > 0 ) //while we can read data from file
             {
@@ -307,13 +327,12 @@ printf("\ec");
 
             }
             exit(0);
-        }
+        //}
         close(fd1[1]);
         close(fd2[1]);
         close(fd2[0]);
     }
 }
-
 wait(NULL); //wait until all children die
 
 return 0;
