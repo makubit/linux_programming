@@ -191,16 +191,15 @@ int main(int argc, char* argv[])
             close(fd1[0]);
             
             /* Prepare buffor to store letters */
-            char buff_print[100];
-            int n_letters = 0;
-            memset(buff_print, 0, 100);
+            char buff_print[78];
+            memset(buff_print, 0, 78);
 
             pid_t for_data = fork();
-            if(for_data ==0)
+            if(for_data == 0)
             {
 
                 int fd_data = open(fileWithData, O_RDONLY | O_NONBLOCK);
-                //int n_letters = 0;
+                int n_letters = 0;
                 char buff_write[1];
 
                 while( read(fd_data, buff_write, 1) > 0 ) //while we can read data from file
@@ -226,18 +225,22 @@ int main(int argc, char* argv[])
                     char char_print[1];
                     read(fd2[0], char_print, 1);
 
-                    if(strcmp(char_print, "") == 0)
-                        n_letters--;
-                    else              
-                        buff_print[n_letters-1] = char_print[0];
+                    if(strcmp(char_print, "") != 0)            
+                    {
+                        buff_print[n_letters] = char_print[0];
+                        n_letters++;
+                    }
 
                     /* PRINTING MAGIC */
-                    printf("\e[%d;%dH%s\n", 2*i + 2, 1, reverseString(buff_print));
+                    char temp_print[78];
+                    strcpy(temp_print, buff_print);
+                    printf("\e[%d;%dH%s\n", 2*i + 2, 1, reverseString(temp_print));
 
-                    n_letters++;
-
-                    if(n_letters == 78)
+                    if(n_letters >= 78)
+                    {
                         n_letters = 0;
+                        printf("\e[%d;%dH\e[2K", 2*i + 2, 1);
+                    }
                 }
                 exit(0);
             } //child
