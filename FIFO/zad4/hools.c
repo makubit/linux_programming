@@ -59,7 +59,6 @@ static void sigusr2_handler(int signo, siginfo_t* status, void* context)
 void displayHelp()
 {
     printf("How to use this program:\n  -d <float number for sleeping>\n  positional parameter \"text\"\n\n");
-
 }
 
 //-------------------------------------------------------------
@@ -116,7 +115,7 @@ int main(int argc, char* argv[])
         signal(SIGUSR1, get_random_disposition());
 
         //z prawdopodobienstwem 1/10 wysyla sygnal SIGUSR1 do grupy procesow, do ktorej sam nalezy
-        if(get_random_number()%2)
+        if(!get_random_number())
         {
             pid_t pgrp = getpgid(getpid());
             killpg(pgrp, SIGUSR1);
@@ -126,7 +125,6 @@ int main(int argc, char* argv[])
 
         //spi przez zadana ilosc w parametrze -d
         nsleep(time);
-
     }
 
     return 0;
