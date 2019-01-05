@@ -29,6 +29,24 @@ void nosleep()
         perror("Nanosleep error\n");
 }
 
+char* reverseString(char* str)
+{
+    int i = 0;
+    int j=strlen(str) - 1;
+    char temp;
+
+    while(i<j)
+    {
+        temp = str[i];
+        str[i] = str[j];
+        str[j] = temp;
+        i++;
+        j--;
+    }
+
+    return str;
+}
+
 //----------------------------------------
 
 int main(int argc, char* argv[])
@@ -171,6 +189,10 @@ int main(int argc, char* argv[])
         else //MAIN parent
         {
             close(fd1[0]);
+            
+            /* Prepare buffor to store letters */
+            char buff_print[100];
+            memset(buff_print, 0, 100);
 
             pid_t for_data = fork();
             if(for_data ==0)
@@ -200,22 +222,50 @@ int main(int argc, char* argv[])
                     /* Read processed string from second pipe */
                     nosleep(); //sleep for 3/4sec
 
-                    char buff_print[1];
-                    read(fd2[0], buff_print, 1);
+                    char char_print[1];
+                    read(fd2[0], char_print, 1);
 
-                    if(strcmp(buff_print, "") == 0)
+                    if(strcmp(char_print, "") == 0)
+                    {
                         n_letters--;
+                        //char_print[0] = 'K';
+                    }
                     
                     /* * * PRINTING MAGIC * * */
-                    printf("\e[%d;%dH%c\n", 2*i + 2, n_letters, buff_print[0]);
+                    else{
+                        //buff_print[n_letters -2] = char_print[0];
+
+                        for(int j = (int)strlen(buff_print) - 2; j >0;j--)
+                            {buff_print[j+1]=buff_print[j];}
+                            //
+                            //printf("%s\n", reverseString(buff_print));
+                
+
+                        buff_print[0] = char_print[0];
+                        //printf("%d  %d\n", (int)strlen(buff_print), n_letters);
+                    }
+
+                    //reverseString(buff_print);
+
+                    //for(int j = n_letters; j >0;j--)
+                    //    buff_print[j+1]=buff_print[j];
+
+                    //printf("\e[%d;%dH%s\n", 2*i + 2, 1, buff_print);
+                    //printf("%s\n", buff_print);
+
+                    /* Store letters */
+                    //buff_print[n_letters-2] = char_print[0];
+                    printf("%s\n", buff_print);
+
 
                     //"\e[M" -> odwróć koniec linii
                     n_letters++;
+
                     if(n_letters == 78)
                         n_letters = 1;
                 }
                 exit(0);
-            }
+            } //child
 
             close(fd1[1]);
             close(fd2[1]);
