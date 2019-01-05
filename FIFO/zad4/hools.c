@@ -34,6 +34,22 @@ void* get_random_disposition()
    return SIG_DFL; 
 }
 
+int get_random_number()
+{
+    srand(time(0));
+
+    return rand() % 10;
+}
+
+void nsleep(float t)
+{
+    struct timespec time;
+    time.tv_sec = t;
+    time.tv_nsec = 0; //TODO: przelicznik na karte dekasekundy
+
+    nanosleep(&time, NULL);
+}
+
 /* Singal SIGUSR2 handling */
 static void sigusr2_handler(int signo, siginfo_t* status, void* context)
 {
@@ -89,17 +105,29 @@ int main(int argc, char* argv[])
 
     sigsuspend(&sigusr2_mask);
 
-    //wypisuje skandowane haslo
-    printf("%s\n", text);
+    while(1)
+    {
 
-    //zmienia dyspozycje dla sygnalu SIGUSR1 na losowo wybrane SIG_IGN lub SIG_DFL
-    //get_random_signal();
-     signal(SIGUSR1, get_random_disposition());
+        //wypisuje skandowane haslo
+        printf("%s\n", text);
 
-    //z prawdopodobienstwem 1/10 wysyla sygnal SIGUSR1 do grupy procesow, do ktorej sam nalezy
+        //zmienia dyspozycje dla sygnalu SIGUSR1 na losowo wybrane SIG_IGN lub SIG_DFL
+        //get_random_signal();
+        signal(SIGUSR1, get_random_disposition());
 
+        //z prawdopodobienstwem 1/10 wysyla sygnal SIGUSR1 do grupy procesow, do ktorej sam nalezy
+        if(get_random_number()%2)
+        {
+            pid_t pgrp = getpgid(getpid());
+            killpg(pgrp, SIGUSR1);
+        }
 
+        printf("%d\n", get_random_number());
 
+        //spi przez zadana ilosc w parametrze -d
+        nsleep(time);
+
+    }
 
     return 0;
 }
