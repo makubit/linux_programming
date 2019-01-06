@@ -53,7 +53,7 @@ void nsleep(float t)
 /* Singal SIGUSR2 handling */
 static void sigusr2_handler(int signo, siginfo_t* status, void* context)
 {
-    printf("Handler\n");
+
 }
 
 void display_help()
@@ -100,19 +100,19 @@ int main(int argc, char* argv[])
     //change text
     strcpy(text, add_pid_to_text(text));
     
-    sigaction(SIGUSR2, &act, NULL); //TODO: check
+    if(sigaction(SIGUSR2, &act, NULL) == -1) //TODO: check
+        perror("chld: SIGUSR2 sigaction error\n");
 
     sigsuspend(&sigusr2_mask);
 
     while(1)
     {
-
         //wypisuje skandowane haslo
         printf("%s\n", text);
 
         //zmienia dyspozycje dla sygnalu SIGUSR1 na losowo wybrane SIG_IGN lub SIG_DFL
         //get_random_signal();
-        signal(SIGUSR1, get_random_disposition());
+        signal(SIGUSR1, SIG_DFL);
 
         //z prawdopodobienstwem 1/10 wysyla sygnal SIGUSR1 do grupy procesow, do ktorej sam nalezy
         if(!get_random_number())
@@ -120,8 +120,6 @@ int main(int argc, char* argv[])
             pid_t pgrp = getpgid(getpid());
             killpg(pgrp, SIGUSR1);
         }
-
-        printf("%d\n", get_random_number());
 
         //spi przez zadana ilosc w parametrze -d
         nsleep(time);
