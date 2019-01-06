@@ -56,7 +56,7 @@ static void sigusr2_handler(int signo, siginfo_t* status, void* context)
     printf("Handler\n");
 }
 
-void displayHelp()
+void display_help()
 {
     printf("How to use this program:\n  -d <float number for sleeping>\n  positional parameter \"text\"\n\n");
 }
