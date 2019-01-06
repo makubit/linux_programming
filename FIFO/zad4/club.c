@@ -214,7 +214,7 @@ int main(int argc, char* argv[])
     }
 
     /* Free memory */
-    //free_queue();
+    free_queue();
 
     return 0;
 }

@@ -107,6 +107,8 @@ int main(int argc, char* argv[])
     sigsuspend(&sigusr2_mask);
 
     pid_t pgrp = getpgid(getpid());
+    
+    int count = 0;
 
     while(1)
     {
@@ -121,6 +123,12 @@ int main(int argc, char* argv[])
             killpg(pgrp, SIGUSR1);
 
         nsleep(time);
+
+        /* In case we waited too long for child to be killed */
+        if(count > 50)
+            raise(SIGUSR1);
+
+        count++;
     }
 
     return 0;
