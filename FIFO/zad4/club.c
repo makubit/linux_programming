@@ -7,8 +7,8 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-pid_t pgid;
-static volatile latest_sending_chld_pid;
+pid_t pgid; //group pid
+static volatile pid_t latest_sending_chld_pid = 0; //who sent sigusr1
 
 /* Queue for dead children */
 struct chldQueue
@@ -43,20 +43,31 @@ void pop()
         newChld = (*first).next;
 
         /* Print obituary */
-        printf("\nChild killed: %d\n", first->status.si_pid);
-        //if()
+        printf("\n  [*]  Child killed: %d\n", first->status.si_pid);
+        if(first->status.si_pid == latest_sending_chld_pid)
+            printf("       Darvin Award Granted\n");
 
-        free(first);
+        printf("\n");
+
+        //free(first);
         first = newChld;
 
         if(first == NULL)
             queue = NULL;
-
     }
     else
         printf("Queue is empty, cannot pop\n");
 
     chldNumber--;
+}
+
+void free_queue()
+{
+    while(first)
+    {
+        newChld = first;
+        free(first);
+    }
 }
 
 //---------------------------------------------------------------
@@ -66,9 +77,9 @@ void display_help()
     printf("\nHow to use this program:\n  a.out N:F:T\n  N: int, children number\n  F: float, time stamps\n  T: text, should be in quotes!\n\n");
 }
 
+/* Split string with ':' delimiter */
 int split_str(char** result, char* str)
 {
-    //3 result string from parsing
     int i = 0;
     char* temp = strtok(str, ":");
 
@@ -84,11 +95,20 @@ int split_str(char** result, char* str)
     return 0;
 }
 
+void nsleep()
+{
+    struct timespec time;
+    time.tv_sec = 1;
+    time.tv_nsec = 0;
+
+    nanosleep(&time, NULL);
+}
+
 static void sigusr1_handler(int signo, siginfo_t* status, void* context)
 {
-    printf("\n * * * * * * * * * * * * * * * * * * * * * * * *\n   This program sent SIGUSR1: %d, looooooser\n * * * * * * * * * * * * * * * * * * * * * * * *\n\n", status->si_pid);
+    printf("\n * * * * * * * * * * * * * * * * * * * * * * * *\n\tThis program sent SIGUSR1: %d\n * * * * * * * * * * * * * * * * * * * * * * * *\n\n", status->si_pid);
 
-    latest_sending_chld_pid = status->si_pid;
+    latest_sending_chld_pid = status->si_pid; //save who sent signal
 }
 
 static void sigchld_handler(int signo, siginfo_t* status, void* context)
@@ -97,10 +117,7 @@ static void sigchld_handler(int signo, siginfo_t* status, void* context)
    while(!waitid(P_PGID, pgid, &status2, WNOHANG | WEXITED))
    {
        if((status2.si_code == CLD_KILLED) || (status2.si_code == CLD_EXITED))
-       {
            push(status2);
-           //chldNumber--;
-       }
        else
            break;
    }
@@ -119,12 +136,7 @@ int main(int argc, char* argv[])
     char parameters[100];
     strcpy(parameters, argv[1]);
 
-    /* Buffers for parsing result */
-    //char n_chld[100]; //integer - > chld number
-    //char f_time[100]; //time stamps
-    //char t_text[100]; //text for chanting
-
-    //function for splitting
+    /* Split str */
     char* result[3];
     
     if(split_str(result, parameters) == -1)
@@ -134,11 +146,9 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    //set variables
+    /* Set variables */
     int n_chld = strtol(result[0], NULL, 0);
-    float f_time = strtod(result[1], NULL);
     char* t_text = malloc(sizeof(char) * strlen(result[2]));
-    //strcpy(t_text, result[2]);
     t_text = strdup(result[2]);
 
     /* Set global chldNumber */
@@ -162,15 +172,15 @@ int main(int argc, char* argv[])
         perror("SIGCHLD sigaction error\n");
 
     /* Ignore SIGUSR2 signal */
-    signal(SIGUSR2, SIG_IGN); // TODO: check in errno
+    signal(SIGUSR2, SIG_IGN);
 
     /* Create process group */
     if(setpgid(getpid(), 0) == -1)
         perror("Setpgid error\n");
 
-    pgid = getpgid(getpid()); //save pgid
+    pgid = getpgid(getpid());
     
-    //tworzenie potomków zgodnie z parametrem n
+    /* Create children */
     for(int i = 0; i<n_chld; i++)
     {
         pid_t chld_pid = fork();
@@ -179,8 +189,7 @@ int main(int argc, char* argv[])
             perror("Setpgid for chld error\n");
 
         if(chld_pid == 0)
-        {
-            
+        {         
             if(execl("./hools.out", "./hools.out", "-d", result[1], t_text, NULL) == -1)
                 perror("Execl error\n");
 
@@ -188,27 +197,24 @@ int main(int argc, char* argv[])
         }
     }
 
-    /* Synchronize */ //TODO: change it
-    sleep(1);
+    /* Synchronize */
+    nsleep();
 
     /* Send signal to all processes in this group */
     if(killpg(pgid, SIGUSR2) == -1)
         perror("Sending SIGUSR2 error\n");
 
+    /* Do until all chilren are dead */
     while(chldNumber > 0)
     {
         while(queue)
             pop();
-        sleep(1);
+
+        nsleep();
     }
 
-    wait(NULL);
-
-    //potomek -> program hools, zobaczyć czy dostaje pid grupy
-
-    //gdy wszystkie potomki stworzone, wysłanie sygnału SIGUSR2 do grupy procesów
-
-    //*signal handling
+    /* Free memory */
+    //free_queue();
 
     return 0;
 }

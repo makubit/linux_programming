@@ -8,6 +8,8 @@
 #include <signal.h>
 #include <sys/types.h>
 
+#define NSEC 1000000
+
 /* Function to add process pid before text */
 char* add_pid_to_text(char* text)
 {
@@ -26,12 +28,12 @@ char* add_pid_to_text(char* text)
 void* get_random_disposition()
 {
    srand(time(0));
-   int random = rand() % 2;
+   int random = (rand() + getpid()) % 2;
 
-   if(random == 0)
-       return SIG_IGN;
-       
-   return SIG_DFL; 
+   if(random != 0)
+       return SIG_DFL;
+
+   return SIG_IGN; 
 }
 
 int get_random_number()
@@ -43,9 +45,10 @@ int get_random_number()
 
 void nsleep(float t)
 {
+    float temp = t * 2.5;
     struct timespec time;
-    time.tv_sec = t;
-    time.tv_nsec = 0; //TODO: przelicznik na karte dekasekundy
+    time.tv_sec = (int)temp;
+    time.tv_nsec = (long)(temp * NSEC) % NSEC;
 
     nanosleep(&time, NULL);
 }
@@ -66,9 +69,9 @@ void display_help()
 int main(int argc, char* argv[])
 {
     int c;
-    char d_parameter[10]; //ilosc czasu do sparsowania
-    float time = 1.0; //kwarta dekasekundy
-    char text[100]; //tekst do skandowania
+    char d_parameter[10];
+    float time = 1.0;
+    char text[100];
 
     while((c = getopt(argc, argv, "d:")) != -1)
         switch(c)
@@ -82,12 +85,10 @@ int main(int argc, char* argv[])
                 break;
         }
 
-    //TODO: Jesli nie ma tekstu -> blad
-
     /* Prepare text */
     strcpy(text, argv[optind]);
 
-    //czeka na sygnal SIGUSR2 od rodzica -> sigsuspend
+    /* Wait for SIGUSR2 */
     sigset_t sigusr2_mask;
     sigfillset(&sigusr2_mask);
     sigdelset(&sigusr2_mask, SIGUSR2);
@@ -97,31 +98,28 @@ int main(int argc, char* argv[])
     act.sa_sigaction = &sigusr2_handler;
     act.sa_flags = SA_SIGINFO;
 
-    //change text
+    /* Change text */
     strcpy(text, add_pid_to_text(text));
     
-    if(sigaction(SIGUSR2, &act, NULL) == -1) //TODO: check
+    if(sigaction(SIGUSR2, &act, NULL) == -1)
         perror("chld: SIGUSR2 sigaction error\n");
 
     sigsuspend(&sigusr2_mask);
 
+    pid_t pgrp = getpgid(getpid());
+
     while(1)
     {
-        //wypisuje skandowane haslo
+        /* Chant */
         printf("%s\n", text);
 
-        //zmienia dyspozycje dla sygnalu SIGUSR1 na losowo wybrane SIG_IGN lub SIG_DFL
-        //get_random_signal();
-        signal(SIGUSR1, SIG_DFL);
+        /* Change disposition */
+        signal(SIGUSR1, get_random_disposition());
 
-        //z prawdopodobienstwem 1/10 wysyla sygnal SIGUSR1 do grupy procesow, do ktorej sam nalezy
+        /* Get random probability & send signal */
         if(!get_random_number())
-        {
-            pid_t pgrp = getpgid(getpid());
             killpg(pgrp, SIGUSR1);
-        }
 
-        //spi przez zadana ilosc w parametrze -d
         nsleep(time);
     }
 
