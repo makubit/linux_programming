@@ -239,7 +239,7 @@ int main(int argc, char* argv[])
                     if(n_letters >= 78)
                     {
                         n_letters = 0;
-                        printf("\e[%d;%dH\e[2K", 2*i + 2, 1);
+                        printf("\e[2K");
                     }
                 }
                 exit(0);
