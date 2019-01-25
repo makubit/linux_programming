@@ -99,7 +99,8 @@ int main(int argc, char* argv[])
    write(fdp[1], byte, 1);
 
    //fd_set set;
-   //FD_ZERO(&set);
+   /
+   FD_ZERO(&set);
    //FD_SET(fdp[1], &set);
 
    //if(select(FD_SETSIZE, NULL, &set, NULL, NULL) <= 0)
