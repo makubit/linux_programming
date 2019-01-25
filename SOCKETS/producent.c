@@ -13,6 +13,11 @@
 
 int main(int argc, char* argv[])
 {
+    /********************************************************
+     * NAWIAZANIE POLACZENIA *
+     *******************************************************/
+
+
     int producer_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(producer_fd == -1)
     {
