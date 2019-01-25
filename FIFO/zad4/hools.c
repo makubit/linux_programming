@@ -53,11 +53,8 @@ void nsleep(float t)
     nanosleep(&time, NULL);
 }
 
-/* Singal SIGUSR2 handling */
 static void sigusr2_handler(int signo, siginfo_t* status, void* context)
-{
-
-}
+{}
 
 void display_help()
 {
@@ -98,11 +95,11 @@ int main(int argc, char* argv[])
     act.sa_sigaction = &sigusr2_handler;
     act.sa_flags = SA_SIGINFO;
 
+    if(sigaction(SIGUSR2, &act, NULL) == -1)
+        perror("chld: SIGUSR2 error\n");
+
     /* Change text */
     strcpy(text, add_pid_to_text(text));
-    
-    if(sigaction(SIGUSR2, &act, NULL) == -1)
-        perror("chld: SIGUSR2 sigaction error\n");
 
     sigsuspend(&sigusr2_mask);
 

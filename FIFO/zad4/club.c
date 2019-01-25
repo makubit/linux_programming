@@ -49,7 +49,6 @@ void pop()
 
         printf("\n");
 
-        //free(first);
         first = newChld;
 
         if(first == NULL)
@@ -197,7 +196,6 @@ int main(int argc, char* argv[])
         }
     }
 
-    /* Synchronize */
     nsleep();
 
     /* Send signal to all processes in this group */
@@ -214,7 +212,7 @@ int main(int argc, char* argv[])
     }
 
     /* Free memory */
-    free_queue();
+    //free_queue();
 
     return 0;
 }
