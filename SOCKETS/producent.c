@@ -136,7 +136,9 @@ int main(int argc, char* argv[])
     send(consumer_fd, s, sizeof(s), 0);
 
     printf("%s\n\n", buff);
-    
+   
+    close(consumer_fd);
+    close(producer_fd);
 
 
     return 0;

@@ -16,7 +16,7 @@
 
 #define PORT 12345
 #define BUFFER_SIZE112 112*1000
-#define BLOCKS 2 
+#define BLOCKS 2
 static char send_s[4] = { 's', 'e', 'n', 'd' };
 
 struct dataraport {
@@ -63,9 +63,16 @@ void gen_raport(struct dataraport* data_r, int blocks)
     }
 }
 
+/**********************************************************************************
+ *********************************************************************************/
 
 int main(int argc, char* argv[])
 {
+    int c;
+
+    //while((c = getopt(argc, argv, "#:r:s:")));
+
+
     /******** CREATE FDS ********/
     int consumer_fd = socket(AF_INET, SOCK_STREAM, 0);
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
@@ -147,7 +154,7 @@ int main(int argc, char* argv[])
                 ticks_counter++;;
             }
 
-            else if(pfds[1].revents == POLLIN)
+            if(pfds[1].revents == POLLIN)
             {
                 clock_gettime(CLOCK_REALTIME, &clock_times[1]);
                 clock_gettime(CLOCK_REALTIME, &clock_times[2]);
@@ -172,7 +179,8 @@ int main(int argc, char* argv[])
 
     gen_raport(data_r, BLOCKS);
 
-    //shutdown()
+    close(timer_fd);
+    close(consumer_fd);
 
     return 0;
 }
