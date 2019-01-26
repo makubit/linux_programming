@@ -12,9 +12,30 @@
 #include <poll.h>
 #include <sys/timerfd.h>
 #include <openssl/md5.h>
+#include <time.h>
 
 #define PORT 12345
+#define BUFFER_SIZE112 112*1000
 static char send_s[4] = { 's', 'e', 'n', 'd' };
+
+void gen_raport(unsigned char* md5_final)
+{
+    struct timespec t_mono;
+    struct timespec t_real;
+
+    clock_gettime(CLOCK_MONOTONIC, &t_mono);
+    clock_gettime(CLOCK_REALTIME, &t_real);
+
+    fprintf(stderr, "\t********** RAPORT **********\n");
+    fprintf(stderr, " -> Monotonic: %ldsec, %ldnsec\n", t_mono.tv_sec, t_mono.tv_nsec);
+    fprintf(stderr, " -> RealTime: %ldsec, %ldnsec\n", t_real.tv_sec, t_real.tv_nsec);
+
+    //roznice czasu
+    //  a) miedzy wyslanie zgloszenia a odczytaniem pierwszych bajtow
+    //  b) odczytaniem pierwszych bajtow, a całością bloku ???
+
+    fprintf(stderr, " -> MD5: %s\n", md5_final);
+}
 
 
 int main(int argc, char* argv[])
@@ -100,7 +121,12 @@ int main(int argc, char* argv[])
             MD5_Init(&contx);
             MD5_Update(&contx, read_data, sizeof(read_data));
             MD5_Final(md5_final, &contx);
-            printf("%s\n\n", md5_final);
+
+            shutdown(consumer_fd, 2); //-> czy aby na pewno tylko shutdown na readzie?
+
+            /********* RAPORT *********/
+            gen_raport(md5_final);
+
         }
     }
 
