@@ -94,7 +94,7 @@ int main(int argc, char* argv[])
     A.sin_family = AF_INET;
     A.sin_port = htons(PORT);
 
-    if(inet_aton("127.0.0.1", &A.sin_addr) == -1)
+    if(inet_aton("127.0.0.2", &A.sin_addr) == -1)
     {
         perror("Aton inet error: Invalid address or address not supported\n");
         exit(EXIT_FAILURE);
@@ -115,7 +115,7 @@ int main(int argc, char* argv[])
     struct sockaddr_in B;
     int addr_lenB = sizeof(B);
 
-    int consumer_fd = accept(producer_fd, (struct sockaddr*)&A, (socklen_t*)&addr_lenA);
+    int consumer_fd = accept(producer_fd, (struct sockaddr*)&B, (socklen_t*)&addr_lenB);
     if(consumer_fd == -1)
     {
         perror("Accept error\n");
@@ -127,8 +127,13 @@ int main(int argc, char* argv[])
     memset(buff, 0, sizeof(buff));
     printf("accepted\n");
 
-    //read(consumer_fd, buff, sizeof(buff));
+    //pthread_t tid[10];
+    //if(pthread_create(&tid[0], NULL, ))
+    read(consumer_fd, buff, sizeof(buff));
     send(consumer_fd,s, sizeof(s), 0 );
+    read(consumer_fd, buff, sizeof(buff));
+
+    send(consumer_fd, s, sizeof(s), 0);
 
     printf("%s\n\n", buff);
     

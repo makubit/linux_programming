@@ -16,7 +16,21 @@
 
 #define PORT 12345
 #define BUFFER_SIZE112 112*1000
+#define BLOCKS 2 
 static char send_s[4] = { 's', 'e', 'n', 'd' };
+
+struct dataraport {
+    struct timespec delay_a;
+    struct timespec delay_b;
+    char* md5_final;
+};
+
+void add_to_dataraport(struct dataraport* data_r, unsigned char* md5_final, int ticks_counter)
+{
+    data_r[ticks_counter].md5_final = malloc(sizeof(md5_final));
+    strcpy(data_r[ticks_counter].md5_final, (char*)md5_final);
+
+}
 
 void gen_raport(unsigned char* md5_final)
 {
@@ -41,50 +55,54 @@ void gen_raport(unsigned char* md5_final)
 int main(int argc, char* argv[])
 {
     /******** CREATE FDS ********/
-   int consumer_fd = socket(AF_INET, SOCK_STREAM, 0);
-   int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
-   if((consumer_fd == -1) || (timer_fd == -1))
-   {
-       perror("Creating consumer error\n");
-       exit(EXIT_FAILURE);
-   }
+    int consumer_fd = socket(AF_INET, SOCK_STREAM, 0);
+    int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
+    if((consumer_fd == -1) || (timer_fd == -1))
+    {
+        perror("Creating consumer error\n");
+        exit(EXIT_FAILURE);
+    }
 
-   /******** CREATE TIMER ********/
-   struct itimerspec ts;
-   ts.it_interval.tv_sec = 0;
-   ts.it_interval.tv_nsec = 0;
-   ts.it_value.tv_sec = 2;
-   ts.it_value.tv_nsec = 500000;
+    /******** CREATE TIMER ********/
+    struct itimerspec ts;
+    ts.it_interval.tv_sec = 1;
+    ts.it_interval.tv_nsec = 500000;
+    ts.it_value.tv_sec = 1;
+    ts.it_value.tv_nsec = 500000;
 
-   if(timerfd_settime(timer_fd, 0, &ts, NULL) < 0)
-   {
-       perror("Set time in timer error\n");
-       close(timer_fd);
-       exit(EXIT_FAILURE);
-   }
+    if(timerfd_settime(timer_fd, 0, &ts, NULL) < 0)
+    {
+        perror("Set time in timer error\n");
+        close(timer_fd);
+        exit(EXIT_FAILURE);
+    }
 
-   /************* CREATE SOCKET **********/
-   struct sockaddr_in A;
-   socklen_t addr_lenA = sizeof(A);
+    /************* CREATE SOCKET **********/
+    struct sockaddr_in A;
+    socklen_t addr_lenA = sizeof(A);
 
-   A.sin_family = AF_INET;
-   A.sin_port = htons(PORT);
+    A.sin_family = AF_INET;
+    A.sin_port = htons(PORT);
 
-   if(inet_aton("127.0.0.1", &A.sin_addr) == -1)
-   {
-       perror("Inet aton error: Invalid address or address not supported\n");
-       exit(EXIT_FAILURE);
-   }
+    if(inet_aton("127.0.0.2", &A.sin_addr) == -1)
+    {
+        perror("Inet aton error: Invalid address or address not supported\n");
+        exit(EXIT_FAILURE);
+    }
 
-   if(connect(consumer_fd, (const struct sockaddr*)&A, addr_lenA) == -1)
-   {
-       perror("Connection failed\n");
-       exit(EXIT_FAILURE);
-   }
+    if(connect(consumer_fd, (const struct sockaddr*)&A, addr_lenA) == -1)
+    {
+        perror("Connection failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    /************** CREATE DATA RAPORT STRUCTURE ***************/
+    struct dataraport data_r[BLOCKS];
 
     /************** POLL **************/
     uint64_t timer_ticks;
     char read_data[8];
+    int returned_fds = 0;
     struct pollfd pfds[2];
     pfds[0].fd = timer_fd;
     pfds[0].events = POLLIN;
@@ -92,43 +110,53 @@ int main(int argc, char* argv[])
     pfds[1].events = POLLIN;
 
 
-    //for(int i = 0; i<5; i++)
-    int returned_fds = poll(pfds, 2, 5000);
-    printf("\n%d -> %d\n", pfds[0].events, pfds[0].revents);
-    printf("\n%d -> %d\n", pfds[1].events, pfds[1].revents);
-
-
-    if(returned_fds > 0)
+    int ticks_counter = 0;
+    //while(ticks_counter <= BLOCKS)
+    for(int i = 0; i<BLOCKS*2; i++)
     {
-        if(pfds[0].revents == POLLIN)
-        {
-            read(timer_fd, &timer_ticks, sizeof(timer_ticks));
+        returned_fds = poll(pfds, 2, 5000);
+        printf("\n%d -> %d\n", pfds[0].events, pfds[0].revents);
+        printf("\n%d -> %d\n", pfds[1].events, pfds[1].revents);
 
-            for(int i = 0; i < timer_ticks; i++)
+        if(returned_fds > 0)
+        {
+            if(pfds[0].revents == POLLIN)
             {
-                send(consumer_fd, send_s, sizeof(send_s), 0);
+                read(timer_fd, &timer_ticks, sizeof(timer_ticks));
+
+                for(int i = 0; i < timer_ticks; i++)
+                {
+                    send(consumer_fd, send_s, sizeof(send_s), 0);
+                }
+
+                ticks_counter+=timer_ticks;
+            }
+
+            else if(pfds[1].revents == POLLIN)
+            {
+                read(consumer_fd, read_data, sizeof(read_data));
+                printf("%s\n", read_data);
+
+                //create md5sum
+                unsigned char md5_final[16];
+                MD5_CTX contx;
+                MD5_Init(&contx);
+                MD5_Update(&contx, read_data, sizeof(read_data));
+                MD5_Final(md5_final, &contx);
+
+                /********* ADD TO DATA RAPORT STRUCTURE  *********/
+                add_to_dataraport(data_r, md5_final, ticks_counter);
+                /*data_r[ticks_counter].md5_final = malloc(sizeof(md5_final));
+                memcpy(data_r[ticks_counter].md5_final, md5_final, sizeof(md5_final));
+                //strcpy(data_r[ticks_counter].md5_final, md5_final);
+                //data_r[ticks_counter].md5_final = md5_final;
+                printf("%s\n\n\n\n", data_r[ticks_counter].md5_final);*/
+
             }
         }
-
-        else if(pfds[1].revents == POLLIN)
-        {
-            read(consumer_fd, read_data, sizeof(read_data));
-            printf("%s\n", read_data);
-
-            //create md5sum
-            unsigned char md5_final[16];
-            MD5_CTX contx;
-            MD5_Init(&contx);
-            MD5_Update(&contx, read_data, sizeof(read_data));
-            MD5_Final(md5_final, &contx);
-
-            shutdown(consumer_fd, 2); //-> czy aby na pewno tylko shutdown na readzie?
-
-            /********* RAPORT *********/
-            gen_raport(md5_final);
-
-        }
     }
+
+    //gen_raport();
 
     return 0;
 }
