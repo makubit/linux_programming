@@ -8,18 +8,40 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <signal.h>
+#include <poll.h>
+#include <sys/timerfd.h>
 
 #define PORT 12345
+static char send_s[4] = { 's', 'e', 'n', 'd' };
+
 
 int main(int argc, char* argv[])
 {
+    /******** CREATE FDS ********/
    int consumer_fd = socket(AF_INET, SOCK_STREAM, 0);
-   if(consumer_fd == -1)
+   int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
+   if((consumer_fd == -1) || (timer_fd == -1))
    {
        perror("Creating consumer error\n");
        exit(EXIT_FAILURE);
    }
 
+   /******** CREATE TIMER ********/
+   struct itimerspec ts;
+   ts.it_interval.tv_sec = 0;
+   ts.it_interval.tv_nsec = 0;
+   ts.it_value.tv_sec = 2;
+   ts.it_value.tv_nsec = 500000;
+
+   if(timerfd_settime(timer_fd, 0, &ts, NULL) < 0)
+   {
+       perror("Set time in timer error\n");
+       close(timer_fd);
+       exit(EXIT_FAILURE);
+   }
+
+   /************* CREATE SOCKET **********/
    struct sockaddr_in A;
    socklen_t addr_lenA = sizeof(A);
 
@@ -38,13 +60,40 @@ int main(int argc, char* argv[])
        exit(EXIT_FAILURE);
    }
 
-   char* buff = "Read da message\n";
-   send(consumer_fd, buff, strlen(buff), 0);
-   printf("Message sent\n");
+    /************** POLL **************/
+    uint64_t timer_ticks;
+    char read_data[8];
+    struct pollfd pfds[2];
+    pfds[0].fd = timer_fd;
+    pfds[0].events = POLLIN;
+    pfds[1].fd = consumer_fd;
+    pfds[1].events = POLLIN;
 
 
+    //for(int i = 0; i<5; i++)
+    int returned_fds = poll(pfds, 2, 5000);
+    printf("\n%d -> %d\n", pfds[0].events, pfds[0].revents);
+    printf("\n%d -> %d\n", pfds[1].events, pfds[1].revents);
 
 
+    if(returned_fds > 0)
+    {
+        if(pfds[0].revents == POLLIN)
+        {
+            read(timer_fd, &timer_ticks, sizeof(timer_ticks));
+
+            for(int i = 0; i < timer_ticks; i++)
+            {
+                send(consumer_fd, send_s, sizeof(send_s), 0);
+            }
+        }
+
+        else if(pfds[1].revents == POLLIN)
+        {
+            read(consumer_fd, read_data, sizeof(read_data));
+            printf("%s\n", read_data);
+        }
+    }
 
     return 0;
 }

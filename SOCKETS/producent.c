@@ -27,7 +27,7 @@ typedef struct c_buff
 
 } c_buff;
 
-void init(c_buff* cbuf, int max)
+void cb_init(c_buff* cbuf, int max)
 {
     cbuf->buffer = malloc(max);
     cbuf->capacity = 0;
@@ -62,7 +62,7 @@ int main(int argc, char* argv[])
     c_buff* cb;
     cb = malloc(sizeof(c_buff));
 
-    init(cb, 100);
+    cb_init(cb, 100);
 
     /************* BUFFER TESTS ***************/
     /*cb_push(cb, 'A');
@@ -80,7 +80,7 @@ int main(int argc, char* argv[])
      * NAWIAZANIE POLACZENIA *
      *******************************************************/
 
-/*
+
     int producer_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(producer_fd == -1)
     {
@@ -123,14 +123,16 @@ int main(int argc, char* argv[])
     }
 
     char buff[100];
+    char* s = "Wysylam";
     memset(buff, 0, sizeof(buff));
     printf("accepted\n");
 
-    read(consumer_fd, buff, sizeof(buff));
+    //read(consumer_fd, buff, sizeof(buff));
+    send(consumer_fd,s, sizeof(s), 0 );
 
     printf("%s\n\n", buff);
     
-*/
+
 
     return 0;
 }
