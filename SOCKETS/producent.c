@@ -10,14 +10,77 @@
 #include <netinet/in.h>
 
 #define PORT 12345
+#define BUFF_SIZE 1024*1024*1.25
+
+/*****************************************************
+ * CIRCULAR BUFFER
+ ****************************************************/
+
+typedef struct c_buff
+{
+    char* buffer;
+    int max;
+    int capacity;
+    int el_size;
+    size_t head;
+    int tail;
+
+} c_buff;
+
+void init(c_buff* cbuf, int max)
+{
+    cbuf->buffer = malloc(max);
+    cbuf->capacity = 0;
+    cbuf->el_size = 1;
+    cbuf->head = 0;
+    cbuf->tail = 0;
+    cbuf->max = max;
+}
+
+void cb_push(c_buff* cbuf, int data)
+{
+    int idx = (cbuf->head) % cbuf->max;
+
+    if(cbuf->capacity == cbuf->max)
+        cbuf->tail++;
+    cbuf->head++;
+    cbuf->buffer[idx] = data; 
+}
+
+int cb_pop(c_buff* cbuf)
+{
+    int idx = (cbuf->tail) % cbuf->max;
+    cbuf->tail++;
+
+    return cbuf->buffer[idx];
+}
+
+//----------------------------------------------------------
 
 int main(int argc, char* argv[])
 {
+    c_buff* cb;
+    cb = malloc(sizeof(c_buff));
+
+    init(cb, 100);
+
+    /************* BUFFER TESTS ***************/
+    /*cb_push(cb, 'A');
+    char* c = "hro";
+    memcpy(&cb->buffer[1], c, strlen(c));
+    cb->head +=3;
+    memcpy(&cb->buffer[cb->head], c, strlen(c));
+    cb->head += strlen(c);
+    printf("%s %d\n", cb->buffer, cb->head);*/
+    /*****************************************/
+
+
+
     /********************************************************
      * NAWIAZANIE POLACZENIA *
      *******************************************************/
 
-
+/*
     int producer_fd = socket(AF_INET, SOCK_STREAM, 0);
     if(producer_fd == -1)
     {
@@ -67,7 +130,7 @@ int main(int argc, char* argv[])
 
     printf("%s\n\n", buff);
     
-
+*/
 
     return 0;
 }
