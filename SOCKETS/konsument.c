@@ -11,6 +11,7 @@
 #include <signal.h>
 #include <poll.h>
 #include <sys/timerfd.h>
+#include <openssl/md5.h>
 
 #define PORT 12345
 static char send_s[4] = { 's', 'e', 'n', 'd' };
@@ -92,6 +93,14 @@ int main(int argc, char* argv[])
         {
             read(consumer_fd, read_data, sizeof(read_data));
             printf("%s\n", read_data);
+
+            //create md5sum
+            unsigned char md5_final[16];
+            MD5_CTX contx;
+            MD5_Init(&contx);
+            MD5_Update(&contx, read_data, sizeof(read_data));
+            MD5_Final(md5_final, &contx);
+            printf("%s\n\n", md5_final);
         }
     }
 
