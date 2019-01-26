@@ -25,14 +25,19 @@ struct dataraport {
     char* md5_final;
 };
 
-void add_to_dataraport(struct dataraport* data_r, unsigned char* md5_final, int ticks_counter)
+void add_to_dataraport(struct dataraport* data_r, unsigned char* md5_final, int ticks_counter, struct timespec* times)
 {
     data_r[ticks_counter].md5_final = malloc(sizeof(md5_final));
     strcpy(data_r[ticks_counter].md5_final, (char*)md5_final);
 
+    data_r[ticks_counter].delay_a.tv_sec = times[1].tv_sec - times[0].tv_sec;
+    data_r[ticks_counter].delay_a.tv_nsec = times[1].tv_nsec - times[0].tv_nsec;
+
+    data_r[ticks_counter].delay_b.tv_sec = times[3].tv_sec - times[2].tv_sec;
+    data_r[ticks_counter].delay_b.tv_nsec = times[3].tv_nsec - times[2].tv_nsec;
 }
 
-void gen_raport(unsigned char* md5_final)
+void gen_raport(struct dataraport* data_r, int blocks)
 {
     struct timespec t_mono;
     struct timespec t_real;
@@ -44,11 +49,18 @@ void gen_raport(unsigned char* md5_final)
     fprintf(stderr, " -> Monotonic: %ldsec, %ldnsec\n", t_mono.tv_sec, t_mono.tv_nsec);
     fprintf(stderr, " -> RealTime: %ldsec, %ldnsec\n", t_real.tv_sec, t_real.tv_nsec);
 
+    fprintf(stderr, " -> PID: %d, IPAddress: 127.0.0.1\n\n", getpid());
+
     //roznice czasu
     //  a) miedzy wyslanie zgloszenia a odczytaniem pierwszych bajtow
-    //  b) odczytaniem pierwszych bajtow, a całością bloku ???
+    //  b) odczytaniem pierwszych bajtow, a całością bloku
 
-    fprintf(stderr, " -> MD5: %s\n", md5_final);
+    for(int i = 0; i<blocks; i++)
+    {
+        fprintf(stderr, " \t********** BLOCK NO %d **********\n", i+1);
+        fprintf(stderr, " -> Diff between sending mes and reading: %ldsec, %ldnsec\n", data_r[i].delay_a.tv_sec, data_r[i].delay_a.tv_nsec);
+        fprintf(stderr, " -> Diff between start & end of reading: %ldsec, %ldnsec\n\n", data_r[i].delay_b.tv_sec, data_r[i].delay_b.tv_nsec);
+    }
 }
 
 
@@ -98,6 +110,8 @@ int main(int argc, char* argv[])
 
     /************** CREATE DATA RAPORT STRUCTURE ***************/
     struct dataraport data_r[BLOCKS];
+    //struct timespec before_read_be, before_read_af, read_be, read_af;
+    struct timespec clock_times[4];
 
     /************** POLL **************/
     uint64_t timer_ticks;
@@ -127,14 +141,18 @@ int main(int argc, char* argv[])
                 for(int i = 0; i < timer_ticks; i++)
                 {
                     send(consumer_fd, send_s, sizeof(send_s), 0);
+                    clock_gettime(CLOCK_REALTIME, &clock_times[0]);
                 }
 
-                ticks_counter+=timer_ticks;
+                ticks_counter++;;
             }
 
             else if(pfds[1].revents == POLLIN)
             {
+                clock_gettime(CLOCK_REALTIME, &clock_times[1]);
+                clock_gettime(CLOCK_REALTIME, &clock_times[2]);
                 read(consumer_fd, read_data, sizeof(read_data));
+                clock_gettime(CLOCK_REALTIME, &clock_times[3]);
                 printf("%s\n", read_data);
 
                 //create md5sum
@@ -145,18 +163,16 @@ int main(int argc, char* argv[])
                 MD5_Final(md5_final, &contx);
 
                 /********* ADD TO DATA RAPORT STRUCTURE  *********/
-                add_to_dataraport(data_r, md5_final, ticks_counter);
-                /*data_r[ticks_counter].md5_final = malloc(sizeof(md5_final));
-                memcpy(data_r[ticks_counter].md5_final, md5_final, sizeof(md5_final));
-                //strcpy(data_r[ticks_counter].md5_final, md5_final);
-                //data_r[ticks_counter].md5_final = md5_final;
-                printf("%s\n\n\n\n", data_r[ticks_counter].md5_final);*/
+                printf("Ticks counter: %d\n", ticks_counter);
+                add_to_dataraport(data_r, md5_final, ticks_counter-1, clock_times);
 
             }
         }
     }
 
-    //gen_raport();
+    gen_raport(data_r, BLOCKS);
+
+    //shutdown()
 
     return 0;
 }
