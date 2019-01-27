@@ -21,6 +21,12 @@
 #define BUFF_SIZE 1024*1024*1.25
 #define DATA_SIZE 640
 
+struct dataraport {
+  int consumer_id;
+  char* ip_addr;
+  int data_blocks;
+};
+
 /*****************************************************
  * CIRCULAR BUFFER
  ****************************************************/
@@ -125,9 +131,8 @@ void generate_raport()
 
 void gen_raport_1(char* raport, struct sockaddr_in B) //new connection
 {
-  printf("in raport\n");
   char temp[1024];
-  memset(raport, 0, 1024);
+  //memset(raport, 0, 1024);
   struct timespec t_mono;
   struct timespec t_real;
 
@@ -140,13 +145,29 @@ void gen_raport_1(char* raport, struct sockaddr_in B) //new connection
   sprintf(temp, " -> RealTime: %ldsec, %ldnsec\n", t_real.tv_sec, t_real.tv_nsec);
   strcat(raport, temp);
 
-  sprintf(temp, " -> IP Address: %s \n", inet_ntoa(B.sin_addr));
+  sprintf(temp, " -> IP Address: %s \n\n", inet_ntoa(B.sin_addr));
   strcat(raport, temp);
 }
 
-void gen_raport_2(char* raport) //lost connection
+void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
 {
+  char temp[1024];
+  memset(raport, 0, 1024);
+  struct timespec t_mono;
+  struct timespec t_real;
 
+  clock_gettime(CLOCK_MONOTONIC, &t_mono);
+  clock_gettime(CLOCK_REALTIME, &t_real);
+
+  strcat(raport, "Lost connection:\n");
+  sprintf(temp, " -> Monotonic: %ldsec, %ldnsec\n", t_mono.tv_sec, t_mono.tv_nsec);
+  strcat(raport, temp);
+  sprintf(temp, " -> RealTime: %ldsec, %ldnsec\n", t_real.tv_sec, t_real.tv_nsec);
+  strcat(raport, temp);
+  sprintf(temp, " -> IP Address: %s \n", data_raport.ip_addr);
+  strcat(raport, temp);
+  sprintf(temp, " -> Ilosc przeslanych bloków: %d \n\n", data_raport.data_blocks-1);
+  strcat(raport, temp);
 }
 
 //----------------------------------------------------------
@@ -272,7 +293,6 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    /************** CREATE DATA RAPORT STRUCTURE ***************/
     /************** POLL **************/
     uint64_t dtimer_ticks, rtimer_ticks;
     char read_data[8];
@@ -294,6 +314,14 @@ int main(int argc, char* argv[])
     int dticks_counter = 0; //??
     int rticks_counter = 0; //??
 
+    /************** CREATE DATA RAPORT STRUCTURE ***************/
+    struct dataraport* data_raport;
+    data_raport = malloc(sizeof(struct dataraport) * consumer_max);
+
+    /***********************************************************
+    * MAIN LOOP
+    ***********************************************************/
+
     while(1)
     {
       returned_fds = poll(pfds, 10, 5000);
@@ -305,7 +333,6 @@ int main(int argc, char* argv[])
             read(dtimer_fd, &dtimer_ticks, sizeof(dtimer_ticks));
 
             cb_push(cb, 'A');
-            //printf("buffer: %s\n", cb->buffer);
 
             dticks_counter++;
             returned_fds--;
@@ -314,7 +341,6 @@ int main(int argc, char* argv[])
           if(pfds[1].revents == POLLIN)
           {
             read(rtimer_fd, &rtimer_ticks, sizeof(rtimer_ticks));
-            //printf("generuj\n");
             generate_raport();
 
             rticks_counter++;
@@ -329,13 +355,14 @@ int main(int argc, char* argv[])
                     exit(EXIT_FAILURE);
             }
 
-            if(pfds[2].revents == POLLHUP)
+            if((pfds[2].revents == POLLHUP) || (pfds[2].revents == (POLLHUP | POLLERR | POLLIN)))
               continue;
 
             if(consumer_counter == consumer_max) //realloc pfds structure
             {
               reallocs++;
               pfds = (struct pollfd*)realloc(pfds, (reallocs * consumer_max) * sizeof(struct pollfd));
+              consumer_max += 50;
             }
 
             //struct for sockaddress
@@ -351,11 +378,17 @@ int main(int argc, char* argv[])
                 exit(EXIT_FAILURE);
             }
 
+            //add to dataraport structure
+            data_raport[consumer_counter].consumer_id = consumer_counter;
+            data_raport[consumer_counter].ip_addr = inet_ntoa(B.sin_addr);
+            data_raport[consumer_counter].data_blocks = 0;
+
             consumer_counter++;
             returned_fds--;
 
             //after new connection -> generate raport
             char rapo[1024];
+            memset(rapo, 0, sizeof(rapo));
             gen_raport_1(rapo, B);
             write(raport_fd, rapo, sizeof(rapo));
           }
@@ -365,8 +398,6 @@ int main(int argc, char* argv[])
           {
             for(int i = 0; i < consumer_counter; i++)
             {
-              //printf("w forze, %d\n", consumer_counter);
-              //printf("%d -> %d\n", POLLHUP | POLLERR, pfds[3].revents);
               if(pfds[i+3].revents == POLLIN)
               {
                 printf("w ifie\n");
@@ -378,7 +409,9 @@ int main(int argc, char* argv[])
                 //TODO: sprawdzić, czy wygenerowalismy odpowiednia ilosc danych, jak nie to robimy break, żeby się wygenerowały
 
                 send(pfds[i+3].fd, s, sizeof(s), 0 );
-                //printf("%d -> %s\n", i, recvmes);
+
+                //add 1 block to structure
+                data_raport[i].data_blocks++;
 
                 returned_fds--;
                 if(returned_fds == 0) //when we read all fds no need to continue
@@ -386,7 +419,11 @@ int main(int argc, char* argv[])
               }
               else if(pfds[i+3].revents == (POLLHUP | POLLERR | POLLIN))
               {
-                printf("lost connection\n");
+                char rapo[1024];
+                memset(rapo, 0, sizeof(rapo));
+                gen_raport_2(rapo, data_raport[i]);
+                write(raport_fd, rapo, sizeof(rapo));
+
                 pfds[i+3].events = 0;
                 pfds[i+3].revents = 0;
                 close(pfds[i+3].fd);
@@ -401,7 +438,6 @@ int main(int argc, char* argv[])
 
     close(dtimer_fd);
     close(rtimer_fd);
-    //close(consumer_fd);
     close(producer_fd);
 
 
