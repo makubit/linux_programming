@@ -14,9 +14,10 @@
 #include <openssl/md5.h>
 #include <time.h>
 
-#define PORT 12345
+//#define PORT 12345
 #define BUFFER_SIZE112 112*1000
-#define BLOCKS 2
+#define NANOSEC 1000000
+//#define BLOCKS 2
 static char send_s[4] = { 's', 'e', 'n', 'd' };
 
 struct dataraport {
@@ -24,6 +25,90 @@ struct dataraport {
     struct timespec delay_b;
     char* md5_final;
 };
+
+void display_help()
+{
+  printf("Instructions:\n -> -#<int> optional(:<int>) mandatory parameter, number of blocks we want to get from producer\n");
+  printf(" -> -s <float> | -r <float> mandatory, time\n");
+  printf(" -> [<addr>:]port mandatory,  port address\n");
+}
+
+int convert_to_int(char* first_p, char* second_p)
+{
+  //convert to int
+  int cnt = strtol(first_p, NULL, 0);
+  if(cnt <= 0)
+  {
+    printf(" <cnt> has to be >= 0\n");
+    display_help();
+    exit(EXIT_FAILURE);
+  }
+  if(second_p)
+  {
+      int cnt_tmp = strtol(second_p, NULL, 0);
+      if(cnt > cnt_tmp)
+      {
+          perror("-# error: second parameter cannot be lesser than first parameter\n");
+          exit(EXIT_FAILURE);
+      }
+
+      srand(time(NULL));
+      return (rand() % (cnt_tmp + 1 - cnt)) + cnt;
+    }
+    return cnt;
+}
+
+float convert_to_float(char* first_p, char* second_p)
+{
+  //convert to float
+  float dly = strtod(first_p, NULL);
+  if(dly <= 0)
+  {
+    printf(" <dly> has to be >= 0\n");
+    display_help();
+    exit(EXIT_FAILURE);
+  }
+  if(second_p)
+  {
+    float dly_tmp = strtod(second_p, NULL);
+    if(dly > dly_tmp)
+    {
+        perror("-# error: second parameter cannot be lesser than first parameter\n");
+        exit(EXIT_FAILURE);
+    }
+
+    srand(time(NULL));
+    return ((float)rand()/RAND_MAX + (rand() % ((int)dly_tmp + 1 - (int)dly)) + (int)dly);
+  }
+  return dly;
+}
+
+int convert_address(char* addr)
+{
+  char* first_p = strtok(addr, "port");
+  first_p = strtok(first_p, "[");
+  first_p = strtok(first_p, ":]");
+
+  int temp = 0;
+  if(first_p == NULL)
+  {
+    char* loc = "localhost";
+    for(int i=0; i< strlen(loc); i++)
+        temp += loc[i];
+
+    return temp;
+  }
+  temp = strtol(first_p, NULL, 0);
+
+  if(temp <= 0)
+  {
+    printf(" port error: wrong port number\n");
+    display_help();
+    exit(EXIT_FAILURE);
+  }
+
+  return temp;
+}
 
 void add_to_dataraport(struct dataraport* data_r, unsigned char* md5_final, int ticks_counter, struct timespec* times)
 {
@@ -37,7 +122,7 @@ void add_to_dataraport(struct dataraport* data_r, unsigned char* md5_final, int 
     data_r[ticks_counter].delay_b.tv_nsec = times[3].tv_nsec - times[2].tv_nsec;
 }
 
-void gen_raport(struct dataraport* data_r, int blocks)
+void gen_raport(struct dataraport* data_r, int cnt)
 {
     struct timespec t_mono;
     struct timespec t_real;
@@ -51,11 +136,11 @@ void gen_raport(struct dataraport* data_r, int blocks)
 
     fprintf(stderr, " -> PID: %d, IPAddress: 127.0.0.1\n\n", getpid());
 
-    //roznice czasu
-    //  a) miedzy wyslanie zgloszenia a odczytaniem pierwszych bajtow
-    //  b) odczytaniem pierwszych bajtow, a całością bloku
+    //time differences
+    //  a) between sending message and reading first bytes of reply
+    //  b) betewwn reading first bytes and last bytes
 
-    for(int i = 0; i<blocks; i++)
+    for(int i = 0; i<cnt; i++)
     {
         fprintf(stderr, " \t********** BLOCK NO %d **********\n", i+1);
         fprintf(stderr, " -> Diff between sending mes and reading: %ldsec, %ldnsec\n", data_r[i].delay_a.tv_sec, data_r[i].delay_a.tv_nsec);
@@ -68,10 +153,78 @@ void gen_raport(struct dataraport* data_r, int blocks)
 
 int main(int argc, char* argv[])
 {
-    int c;
+  int c;
+  char* tempbuff = NULL;
+  int cnt = 0;
+  float dly = 0;
+  char* first_p = NULL;
+  char* second_p = NULL;
+  int port_addr = 0;
 
-    //while((c = getopt(argc, argv, "#:r:s:")));
+  while((c = getopt(argc, argv, "#:r:s:")) != -1)
+    {
+      switch(c)
+      {
+          case '#':
+              tempbuff = malloc(sizeof(optarg));
+              strcpy(tempbuff, optarg);
+              first_p = strtok(tempbuff, ":");
+              second_p = strtok(NULL, ":");
 
+              //convert to int
+              cnt = convert_to_int(first_p, second_p);
+
+              break;
+          case 'r':
+              if(dly > 0)
+              {
+                  printf(" -r error, cannot use both -r and -s\n");
+                  display_help();
+                  exit(EXIT_FAILURE);
+              }
+
+              tempbuff = malloc(sizeof(optarg));
+              strcpy(tempbuff, optarg);
+              first_p = strtok(tempbuff, ":");
+              second_p = strtok(NULL, ":");
+
+              //convert to float
+              dly = convert_to_float(first_p, second_p);
+              printf("%lf\n", dly);
+
+              break;
+          case 's':
+              if(dly > 0)
+              {
+                  printf(" -r error, cannot use both -r and -s\n");
+                  display_help();
+                  exit(EXIT_FAILURE);
+              }
+
+              tempbuff = malloc(sizeof(optarg));
+              strcpy(tempbuff, optarg);
+              first_p = strtok(tempbuff, ":");
+              second_p = strtok(NULL, ":");
+
+              //convert to float
+              dly = convert_to_float(first_p, second_p);
+
+              break;
+          case '?':
+              display_help();
+              break;
+      }
+    }
+
+    if((cnt == 0) || (dly == 0) || (argv[optind] == NULL))
+    {
+      printf(" Mandatory parameters: <cnt>, <dly>, [<addr>]:port\n");
+      display_help();
+      exit(EXIT_FAILURE);
+    }
+
+    port_addr = convert_address(argv[optind]);
+    printf("%d\n\n", port_addr);
 
     /******** CREATE FDS ********/
     int consumer_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -84,10 +237,10 @@ int main(int argc, char* argv[])
 
     /******** CREATE TIMER ********/
     struct itimerspec ts;
-    ts.it_interval.tv_sec = 1;
-    ts.it_interval.tv_nsec = 500000;
-    ts.it_value.tv_sec = 1;
-    ts.it_value.tv_nsec = 500000;
+    ts.it_interval.tv_sec = (long)(dly);
+    ts.it_interval.tv_nsec = (long)(dly * NANOSEC) % NANOSEC;
+    ts.it_value.tv_sec = (long)(dly);
+    ts.it_value.tv_nsec = (long)(dly * NANOSEC) % NANOSEC;
 
     if(timerfd_settime(timer_fd, 0, &ts, NULL) < 0)
     {
@@ -101,7 +254,7 @@ int main(int argc, char* argv[])
     socklen_t addr_lenA = sizeof(A);
 
     A.sin_family = AF_INET;
-    A.sin_port = htons(PORT);
+    A.sin_port = htons(port_addr);
 
     if(inet_aton("127.0.0.2", &A.sin_addr) == -1)
     {
@@ -116,7 +269,7 @@ int main(int argc, char* argv[])
     }
 
     /************** CREATE DATA RAPORT STRUCTURE ***************/
-    struct dataraport data_r[BLOCKS];
+    struct dataraport data_r[cnt];
     //struct timespec before_read_be, before_read_af, read_be, read_af;
     struct timespec clock_times[4];
 
@@ -133,7 +286,7 @@ int main(int argc, char* argv[])
 
     int ticks_counter = 0;
     //while(ticks_counter <= BLOCKS)
-    for(int i = 0; i<BLOCKS*2; i++)
+    for(int i = 0; i<cnt*2; i++)
     {
         returned_fds = poll(pfds, 2, 5000);
         printf("\n%d -> %d\n", pfds[0].events, pfds[0].revents);
@@ -177,7 +330,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    gen_raport(data_r, BLOCKS);
+    gen_raport(data_r, cnt);
 
     close(timer_fd);
     close(consumer_fd);
