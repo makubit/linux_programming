@@ -8,8 +8,13 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <time.h>
+#include <signal.h>
+#include <poll.h>
+#include <sys/timerfd.h>
 
 #define PORT 12345
+#define NANOSEC 1000000
 #define BUFF_SIZE 1024*1024*1.25
 
 /*****************************************************
@@ -117,6 +122,7 @@ int main(int argc, char* argv[])
   char* tempbuff = NULL;
   char* raport_path = NULL;
   float pace_val = 0;
+  int port_addr = 0;
 
   while((c = getopt(argc, argv, "r:t:")) != -1)
     {
@@ -129,7 +135,7 @@ int main(int argc, char* argv[])
           case 't':
               tempbuff = malloc(sizeof(optarg));
               strcpy(tempbuff, optarg);
-              pace_val = convert_to_int18(tempbuff);
+              pace_val = convert_to_float18(tempbuff);
               break;
           case '?':
               display_help();
@@ -167,16 +173,41 @@ int main(int argc, char* argv[])
 
 
     /********************************************************
-     * NAWIAZANIE POLACZENIA *
+     * SOCKET *
      *******************************************************/
 
-
+    /********* CREATE FDS **********/
     int producer_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if(producer_fd == -1)
+    int dtimer_fd = timerfd_create(CLOCK_MONOTONIC, 0); //to produce data
+    int rtimer_fd = timerfd_create(CLOCK_MONOTONIC, 0); //to generate raport
+    if((producer_fd == -1) || (dtimer_fd == -1) || (rtimer_fd == -1))
     {
-        perror("Creating producer error");
+        perror("Creating consumer or timer error\n");
         exit(EXIT_FAILURE);
     }
+
+    /******** CREATE TIMERS ********/
+    struct itimerspec dts, rts; //dts -> struct for dtimer_fd, rts -> struct for rtimer_fd
+
+    dts.it_interval.tv_sec = (long)(pace_val);
+    dts.it_interval.tv_nsec = (long)(pace_val * NANOSEC) % NANOSEC;
+    dts.it_value.tv_sec = (long)(pace_val);
+    dts.it_value.tv_nsec = (long)(pace_val * NANOSEC) % NANOSEC;
+
+    rts.it_interval.tv_sec = 5;
+    rts.it_interval.tv_nsec = 0;
+    rts.it_value.tv_sec = 0;
+    rts.it_value.tv_nsec = 0;
+
+    if((timerfd_settime(dtimer_fd, 0, &dts, NULL) < 0) || (timerfd_settime(rtimer_fd, 0, &rts, NULL) < 0))
+    {
+        perror("Set time in dtimer or rtimer error\n");
+        close(dtimer_fd);
+        close(rtimer_fd);
+        exit(EXIT_FAILURE);
+    }
+
+
 
     struct sockaddr_in A;
     socklen_t addr_lenA = sizeof(A);
@@ -227,6 +258,8 @@ int main(int argc, char* argv[])
 
     printf("%s\n\n", buff);
 
+    close(dtimer_fd);
+    close(rtimer_fd);
     close(consumer_fd);
     close(producer_fd);
 

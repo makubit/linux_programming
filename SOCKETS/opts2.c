@@ -92,7 +92,6 @@ int main(int argc, char* argv[])
       }
 
       port_addr = convert_address(argv[optind]);
-      printf("--%d\n", port_addr);
 
 
 

@@ -230,7 +230,7 @@ int main(int argc, char* argv[])
     int timer_fd = timerfd_create(CLOCK_MONOTONIC, 0);
     if((consumer_fd == -1) || (timer_fd == -1))
     {
-        perror("Creating consumer error\n");
+        perror("Creating consumer or timer error\n");
         exit(EXIT_FAILURE);
     }
 
