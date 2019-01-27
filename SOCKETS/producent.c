@@ -385,8 +385,9 @@ int main(int argc, char* argv[])
             {
               reallocs++;
               pfds = (struct pollfd*)realloc(pfds, (reallocs * consumer_max) * sizeof(struct pollfd));
-              consumer_max += 50;
+
               //realloc data_raport
+              data_blocks = (struct dataraport*)realloc(data_blocks, (reallocs * consumer_max) * siezof(struct dataraport));
             }
 
             //struct for sockaddress
