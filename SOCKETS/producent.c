@@ -246,9 +246,11 @@ int main(int argc, char* argv[])
     uint64_t dtimer_ticks, rtimer_ticks;
     char read_data[8];
     int returned_fds = 0;
-    int clients_counter = 0;
+    int consumer_counter = 0;
+    int consumer_max = 10;
+    int consumer_fds[10];
 
-    struct pollfd pfds[10]; //resize
+    struct pollfd pfds[13]; //resize
     pfds[0].fd = dtimer_fd;
     pfds[0].events = POLLIN;
     pfds[1].fd = rtimer_fd;
@@ -287,16 +289,33 @@ int main(int argc, char* argv[])
             rticks_counter++;
           }
 
-          if(pfds[2].revents) //id some actions on this socket -> listen and try do connect
+          if(pfds[2].revents) //if some actions on this socket -> listen and connect
           {
             if(listen(producer_fd, 50) == -1)
             {
                     perror("Cannot listen error\n");
                     exit(EXIT_FAILURE);
-                    //continue;
             }
-            printf("%d, %d\n", pfds[2].revents, POLLHUP);
-            pfds[2].revents = 0;
+
+            if(pfds[2].revents == POLLHUP)
+              continue;
+
+            //if(consumer_counter == consumer_max)
+            //{
+              //realloc
+            //}
+
+            struct sockaddr_in B;
+            int addr_lenB = sizeof(B);
+
+            consumer_fds[consumer_counter] = accept(producer_fd, (struct sockaddr*)&B, (socklen_t*)&addr_lenB);
+            if(consumer_fds[consumer_counter] == -1)
+            {
+                perror("Accept error\n");
+                exit(EXIT_FAILURE);
+            }
+            printf("accepted\n");
+
 
 
           }
@@ -308,13 +327,13 @@ int main(int argc, char* argv[])
     }
 
 
-    if(listen(producer_fd, 50) == -1)
+    /*if(listen(producer_fd, 50) == -1)
     {
         perror("Listen error\n");
         exit(EXIT_FAILURE);
-    }
+    }*/
 
-    struct sockaddr_in B;
+    /*struct sockaddr_in B;
     int addr_lenB = sizeof(B);
 
     int consumer_fd = accept(producer_fd, (struct sockaddr*)&B, (socklen_t*)&addr_lenB);
@@ -322,9 +341,9 @@ int main(int argc, char* argv[])
     {
         perror("Accept error\n");
         exit(EXIT_FAILURE);
-    }
+    }*/
 
-    char buff[100];
+    /*char buff[100];
     char* s = "Wysylam";
     memset(buff, 0, sizeof(buff));
     printf("accepted\n");
@@ -337,11 +356,11 @@ int main(int argc, char* argv[])
 
     send(consumer_fd, s, sizeof(s), 0);
 
-    printf("%s\n\n", buff);
+    printf("%s\n\n", buff);*/
 
     close(dtimer_fd);
     close(rtimer_fd);
-    close(consumer_fd);
+    //close(consumer_fd);
     close(producer_fd);
 
 
