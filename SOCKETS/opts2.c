@@ -57,7 +57,19 @@ int convert_address(char* addr)
 
 int main(int argc, char* argv[])
 {
-    int c;
+
+while(1)
+{
+  while(1)
+  {
+    printf("cos\n" );
+    break;
+  }
+  printf("cos2\n" );
+
+}
+
+    /*int c;
     char* tempbuff = NULL;
     char* raport_path = NULL;
     float pace_val = 0;
@@ -95,7 +107,7 @@ int main(int argc, char* argv[])
 
 
       char* test = "localhost";
-      printf("%d\n\n\n\n", (int)(test));
+      printf("%d\n\n\n\n", (int)(test));*/
 
 
 

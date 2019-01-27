@@ -13,7 +13,7 @@
 #include <poll.h>
 #include <sys/timerfd.h>
 
-//#define PORT 12345
+#define PORT 12345
 #define NANOSEC 1000000
 #define BUFF_SIZE 1024*1024*1.25
 #define DATA_SIZE 640
@@ -264,8 +264,8 @@ int main(int argc, char* argv[])
     while(1)
     {
       returned_fds = poll(pfds, 10, 5000);
-      //printf("\n%d -> %d\n", pfds[0].events, pfds[0].revents);
-      //printf("%d -> %d\n", pfds[1].events, pfds[1].revents);
+      printf("\n%d -> %d\n", pfds[0].events, pfds[0].revents);
+      printf("%d -> %d\n", pfds[1].events, pfds[1].revents);
       //printf("%d -> %d\n", pfds[2].events, pfds[2].revents);
 
       if(returned_fds > 0)
@@ -278,7 +278,6 @@ int main(int argc, char* argv[])
             printf("buffer: %s\n", cb->buffer);
 
             dticks_counter++;
-            returned_fds--;
           }
 
           if(pfds[1].revents == POLLIN)
@@ -288,7 +287,6 @@ int main(int argc, char* argv[])
             generate_raport();
 
             rticks_counter++;
-            returned_fds--;
           }
 
           if(pfds[2].revents) //if some actions on this socket -> listen and connect
@@ -307,57 +305,58 @@ int main(int argc, char* argv[])
               //realloc
             //}
 
-            //add fd to poll struct
-            //pfds[consumer_counter+3].fd = consumer_fds[consumer_counter];
-            pfds[consumer_counter+3].events = POLLIN;
-
             struct sockaddr_in B;
             int addr_lenB = sizeof(B);
 
-            pfds[consumer_counter+3].fd  = accept(producer_fd, (struct sockaddr*)&B, (socklen_t*)&addr_lenB);
-            if(pfds[consumer_counter+3].fd  == -1)
+            consumer_fds[consumer_counter] = accept(producer_fd, (struct sockaddr*)&B, (socklen_t*)&addr_lenB);
+            if(consumer_fds[consumer_counter] == -1)
             {
                 perror("Accept error\n");
                 exit(EXIT_FAILURE);
             }
-
-            consumer_counter++;
-            returned_fds--;
-
             printf("accepted\n");
+
+
 
           }
 
           //każda dalsza ilość fds, trzeba przeleciec wszystkie
-          if(returned_fds > 0)
-          {
-            for(int i = 0; i < consumer_counter; i++)
-            {
-              printf("w forze, %d\n", consumer_counter);
-              printf("%d -> %d\n", POLLHUP | POLLERR, pfds[3].revents);
-              if(pfds[i+3].revents == POLLIN)
-              {
-                printf("w ifie\n");
-                //konsument wysłał, sprawdzamy, czy 4 bajty, jak tak, to wysyłamy porcję danych
-                char recvmes[4];
-                char* s = "cos tam\n";
-                read(pfds[i+3].fd, recvmes, sizeof(recvmes));
-
-                //TODO: sprawdzić, czy wygenerowalismy odpowiednia ilosc danych, jak nie to robimy break, żeby się wygenerowały
-
-                send(pfds[i+3].fd, s, sizeof(s), 0 );
-                printf("%d -> %s\n", i, recvmes);
-
-                returned_fds--;
-                if(returned_fds == 0) //when we read all fds no need to continue
-                  break;
-              }
-            }
-          }
       }
 
       sleep(1);
     }
+
+
+    /*if(listen(producer_fd, 50) == -1)
+    {
+        perror("Listen error\n");
+        exit(EXIT_FAILURE);
+    }*/
+
+    /*struct sockaddr_in B;
+    int addr_lenB = sizeof(B);
+
+    int consumer_fd = accept(producer_fd, (struct sockaddr*)&B, (socklen_t*)&addr_lenB);
+    if(consumer_fd == -1)
+    {
+        perror("Accept error\n");
+        exit(EXIT_FAILURE);
+    }*/
+
+    /*char buff[100];
+    char* s = "Wysylam";
+    memset(buff, 0, sizeof(buff));
+    printf("accepted\n");
+
+    //pthread_t tid[10];
+    //if(pthread_create(&tid[0], NULL, ))
+    read(consumer_fd, buff, sizeof(buff));
+    send(consumer_fd,s, sizeof(s), 0 );
+    read(consumer_fd, buff, sizeof(buff));
+
+    send(consumer_fd, s, sizeof(s), 0);
+
+    printf("%s\n\n", buff);*/
 
     close(dtimer_fd);
     close(rtimer_fd);
