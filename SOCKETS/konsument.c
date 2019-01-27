@@ -223,7 +223,6 @@ int main(int argc, char* argv[])
     }
 
     port_addr = convert_address(argv[optind]);
-    //printf("%d\n\n", port_addr);
 
     /******** CREATE FDS ********/
     int consumer_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -287,8 +286,6 @@ int main(int argc, char* argv[])
     for(int i = 0; i<cnt*2; i++)
     {
         returned_fds = poll(pfds, 2, 5000);
-        printf("\n%d -> %d\n", pfds[0].events, pfds[0].revents);
-        printf("\n%d -> %d\n", pfds[1].events, pfds[1].revents);
 
         if(returned_fds > 0)
         {
@@ -310,7 +307,6 @@ int main(int argc, char* argv[])
                 clock_gettime(CLOCK_REALTIME, &clock_times[2]);
                 read(consumer_fd, read_data, sizeof(read_data));
                 clock_gettime(CLOCK_REALTIME, &clock_times[3]);
-                printf("%s\n", read_data);
 
                 //create md5sum
                 unsigned char md5_final[16];
@@ -320,7 +316,6 @@ int main(int argc, char* argv[])
                 MD5_Final(md5_final, &contx);
 
                 /********* ADD TO DATA RAPORT STRUCTURE  *********/
-                printf("Ticks counter: %d\n", ticks_counter);
                 add_to_dataraport(data_r, md5_final, ticks_counter-1, clock_times);
             }
         }

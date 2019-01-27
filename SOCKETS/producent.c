@@ -21,6 +21,8 @@
 #define BUFF_SIZE 1024*1024*1.25
 #define DATA_SIZE 640
 
+static int connected = 0;
+
 struct dataraport {
   int consumer_id;
   char* ip_addr;
@@ -123,16 +125,32 @@ int convert_address(char* addr)
   return temp;
 }
 
-//-------------- RAPORT ----------------
-void generate_raport()
+//-------------- RAPORTS ----------------
+void generate_raport(char* raport)
 {
-  printf("generate_raport\n");
+  char temp[1024];
+  memset(raport, 0, 1024);
+  struct timespec t_mono;
+  struct timespec t_real;
+
+  clock_gettime(CLOCK_MONOTONIC, &t_mono);
+  clock_gettime(CLOCK_REALTIME, &t_real);
+
+  strcat(raport, "Regular raport:\n");
+  sprintf(temp, " -> Monotonic: %ldsec, %ldnsec\n", t_mono.tv_sec, t_mono.tv_nsec);
+  strcat(raport, temp);
+  sprintf(temp, " -> RealTime: %ldsec, %ldnsec\n", t_real.tv_sec, t_real.tv_nsec);
+  strcat(raport, temp);
+  sprintf(temp, " -> Connected: %d\n", connected);
+  strcat(raport, temp);
+  sprintf(temp, " -> Storage: \n\n");
+  strcat(raport, temp);
 }
 
 void gen_raport_1(char* raport, struct sockaddr_in B) //new connection
 {
   char temp[1024];
-  //memset(raport, 0, 1024);
+  memset(raport, 0, 1024);
   struct timespec t_mono;
   struct timespec t_real;
 
@@ -341,7 +359,12 @@ int main(int argc, char* argv[])
           if(pfds[1].revents == POLLIN)
           {
             read(rtimer_fd, &rtimer_ticks, sizeof(rtimer_ticks));
-            generate_raport();
+
+            char rapo[1024];
+            memset(rapo, 0, sizeof(rapo));
+            generate_raport(rapo);
+
+            write(raport_fd, rapo, sizeof(rapo));
 
             rticks_counter++;
             returned_fds--;
@@ -363,6 +386,7 @@ int main(int argc, char* argv[])
               reallocs++;
               pfds = (struct pollfd*)realloc(pfds, (reallocs * consumer_max) * sizeof(struct pollfd));
               consumer_max += 50;
+              //realloc data_raport
             }
 
             //struct for sockaddress
@@ -385,6 +409,7 @@ int main(int argc, char* argv[])
 
             consumer_counter++;
             returned_fds--;
+            connected++;
 
             //after new connection -> generate raport
             char rapo[1024];
@@ -400,7 +425,6 @@ int main(int argc, char* argv[])
             {
               if(pfds[i+3].revents == POLLIN)
               {
-                printf("w ifie\n");
                 //konsument wysłał, sprawdzamy, czy 4 bajty, jak tak, to wysyłamy porcję danych
                 char recvmes[4];
                 char* s = "cos tam\n";
@@ -428,6 +452,7 @@ int main(int argc, char* argv[])
                 pfds[i+3].revents = 0;
                 close(pfds[i+3].fd);
 
+                connected--;
               }
             }
           }
