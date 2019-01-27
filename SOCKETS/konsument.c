@@ -14,10 +14,9 @@
 #include <openssl/md5.h>
 #include <time.h>
 
-//#define PORT 12345
 #define BUFFER_SIZE112 112*1000
 #define NANOSEC 1000000
-//#define BLOCKS 2
+#define TIMER_LOCATION 1 //-r: 1, -s: 0
 static char send_s[4] = { 's', 'e', 'n', 'd' };
 
 struct dataraport {
@@ -270,7 +269,6 @@ int main(int argc, char* argv[])
 
     /************** CREATE DATA RAPORT STRUCTURE ***************/
     struct dataraport data_r[cnt];
-    //struct timespec before_read_be, before_read_af, read_be, read_af;
     struct timespec clock_times[4];
 
     /************** POLL **************/
@@ -282,7 +280,6 @@ int main(int argc, char* argv[])
     pfds[0].events = POLLIN;
     pfds[1].fd = consumer_fd;
     pfds[1].events = POLLIN;
-
 
     int ticks_counter = 0;
     //while(ticks_counter <= BLOCKS)
@@ -298,13 +295,12 @@ int main(int argc, char* argv[])
             {
                 read(timer_fd, &timer_ticks, sizeof(timer_ticks));
 
+                if(TIMER_LOCATION)
                 for(int i = 0; i < timer_ticks; i++)
-                {
                     send(consumer_fd, send_s, sizeof(send_s), 0);
-                    clock_gettime(CLOCK_REALTIME, &clock_times[0]);
-                }
 
-                ticks_counter++;;
+                clock_gettime(CLOCK_REALTIME, &clock_times[0]);
+                ticks_counter++;
             }
 
             if(pfds[1].revents == POLLIN)
@@ -325,7 +321,6 @@ int main(int argc, char* argv[])
                 /********* ADD TO DATA RAPORT STRUCTURE  *********/
                 printf("Ticks counter: %d\n", ticks_counter);
                 add_to_dataraport(data_r, md5_final, ticks_counter-1, clock_times);
-
             }
         }
     }
