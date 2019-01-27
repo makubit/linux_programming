@@ -223,7 +223,7 @@ int main(int argc, char* argv[])
     }
 
     port_addr = convert_address(argv[optind]);
-    printf("%d\n\n", port_addr);
+    //printf("%d\n\n", port_addr);
 
     /******** CREATE FDS ********/
     int consumer_fd = socket(AF_INET, SOCK_STREAM, 0);
