@@ -94,7 +94,8 @@ int main(int argc, char* argv[])
       port_addr = convert_address(argv[optind]);
 
 
-
+      char* test = "localhost";
+      printf("%d\n\n\n\n", (int)(test));
 
 
 

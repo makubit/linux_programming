@@ -16,7 +16,6 @@
 #define PORT 12345
 #define NANOSEC 1000000
 #define BUFF_SIZE 1024*1024*1.25
-#define DATA_SIZE 640
 
 /*****************************************************
  * CIRCULAR BUFFER
@@ -114,12 +113,6 @@ int convert_address(char* addr)
   return temp;
 }
 
-//-------------- RAPORT ----------------
-void generate_raport()
-{
-  printf("generate_raport\n");
-}
-
 //----------------------------------------------------------
 //----------------------------------------------------------
 
@@ -165,7 +158,7 @@ int main(int argc, char* argv[])
     c_buff* cb;
     cb = malloc(sizeof(c_buff));
 
-    cb_init(cb, 10);
+    cb_init(cb, 100);
 
     /************* BUFFER TESTS ***************/
     /*cb_push(cb, 'A');
@@ -203,31 +196,24 @@ int main(int argc, char* argv[])
 
     rts.it_interval.tv_sec = 5;
     rts.it_interval.tv_nsec = 0;
-    rts.it_value.tv_sec = 5;
+    rts.it_value.tv_sec = 0;
     rts.it_value.tv_nsec = 0;
 
-    if(timerfd_settime(dtimer_fd, 0, &dts, NULL) < 0)
+    if((timerfd_settime(dtimer_fd, 0, &dts, NULL) < 0) || (timerfd_settime(rtimer_fd, 0, &rts, NULL) < 0))
     {
-        perror("Set time in dtimer error\n");
+        perror("Set time in dtimer or rtimer error\n");
         close(dtimer_fd);
         close(rtimer_fd);
         exit(EXIT_FAILURE);
     }
 
-    if(timerfd_settime(rtimer_fd, 0, &rts, NULL) < 0)
-    {
-        perror("Set time in rtimer error\n");
-        close(dtimer_fd);
-        close(rtimer_fd);
-        exit(EXIT_FAILURE);
-    }
 
-    /************* CREATE SOCKET **********/
+
     struct sockaddr_in A;
     socklen_t addr_lenA = sizeof(A);
 
     A.sin_family = AF_INET;
-    A.sin_port = htons(port_addr);
+    A.sin_port = htons(PORT);
 
     if(inet_aton("127.0.0.2", &A.sin_addr) == -1)
     {
@@ -240,73 +226,6 @@ int main(int argc, char* argv[])
         perror("bind error\n");
         exit(EXIT_FAILURE);
     }
-
-    /************** CREATE DATA RAPORT STRUCTURE ***************/
-    /************** POLL **************/
-    uint64_t dtimer_ticks, rtimer_ticks;
-    char read_data[8];
-    int returned_fds = 0;
-    int clients_counter = 0;
-
-    struct pollfd pfds[10]; //resize
-    pfds[0].fd = dtimer_fd;
-    pfds[0].events = POLLIN;
-    pfds[1].fd = rtimer_fd;
-    pfds[1].events = POLLIN;
-    pfds[2].fd = producer_fd;
-    pfds[2].events = POLLIN;
-
-    int dticks_counter = 0; //??
-    int rticks_counter = 0; //??
-
-    while(1)
-    {
-      returned_fds = poll(pfds, 10, 5000);
-      printf("\n%d -> %d\n", pfds[0].events, pfds[0].revents);
-      printf("%d -> %d\n", pfds[1].events, pfds[1].revents);
-      //printf("%d -> %d\n", pfds[2].events, pfds[2].revents);
-
-      if(returned_fds > 0)
-      {
-          if(pfds[0].revents == POLLIN)
-          {
-            read(dtimer_fd, &dtimer_ticks, sizeof(dtimer_ticks));
-
-            cb_push(cb, 'A');
-            printf("buffer: %s\n", cb->buffer);
-
-            dticks_counter++;
-          }
-
-          if(pfds[1].revents == POLLIN)
-          {
-            read(rtimer_fd, &rtimer_ticks, sizeof(rtimer_ticks));
-            printf("generuj\n");
-            generate_raport();
-
-            rticks_counter++;
-          }
-
-          if(pfds[2].revents) //id some actions on this socket -> listen and try do connect
-          {
-            if(listen(producer_fd, 50) == -1)
-            {
-                    perror("Cannot listen error\n");
-                    exit(EXIT_FAILURE);
-                    //continue;
-            }
-            printf("%d, %d\n", pfds[2].revents, POLLHUP);
-            pfds[2].revents = 0;
-
-
-          }
-
-          //każda dalsza ilość fds, trzeba przeleciec wszystkie
-      }
-
-      sleep(1);
-    }
-
 
     if(listen(producer_fd, 50) == -1)
     {

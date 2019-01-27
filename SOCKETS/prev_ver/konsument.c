@@ -275,7 +275,6 @@ int main(int argc, char* argv[])
     uint64_t timer_ticks;
     char read_data[8];
     int returned_fds = 0;
-
     struct pollfd pfds[2];
     pfds[0].fd = timer_fd;
     pfds[0].events = POLLIN;
@@ -329,7 +328,6 @@ int main(int argc, char* argv[])
     gen_raport(data_r, cnt);
 
     close(timer_fd);
-    shutdown(consumer_fd, 2);
     close(consumer_fd);
 
     return 0;
