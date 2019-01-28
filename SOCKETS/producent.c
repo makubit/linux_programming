@@ -68,13 +68,16 @@ struct dataraport {
 
      if(cbuf->capacity == cbuf->max)
          cbuf->tail++;
-     cbuf->head++;
-     cbuf->capacity++;
-     cbuf->generated++;
+     else //add only if capacity < max
+     {
+       cbuf->capacity++;
+       cbuf->head++;
+       cbuf->generated++;
 
-     //add 640 bytes
-     cbuf->buffer[idx].buffer = malloc(GEN_BLOCK_SIZE);
-     memset(cbuf->buffer[idx].buffer, data, GEN_BLOCK_SIZE);
+       //add 640 bytes
+       cbuf->buffer[idx].buffer = malloc(GEN_BLOCK_SIZE);
+       memset(cbuf->buffer[idx].buffer, data, GEN_BLOCK_SIZE);
+     }
  }
 
  char* cb_pop(c_buff* cbuf, char* data)
@@ -259,7 +262,7 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
   strcat(raport, temp);
   sprintf(temp, " -> IP Address: %s \n", data_raport.ip_addr);
   strcat(raport, temp);
-  sprintf(temp, " -> Ilosc przeslanych bloków: %d \n\n", data_raport.data_blocks);
+  sprintf(temp, " -> Ilosc przeslanych bloków: %d \n\n", data_raport.data_blocks-1);
   strcat(raport, temp);
 }
 
@@ -377,7 +380,6 @@ int main(int argc, char* argv[])
 
     /************** POLL **************/
     uint64_t dtimer_ticks, rtimer_ticks;
-    char read_data[8];
     int returned_fds = 0;
     int consumer_counter = 0;
     int reallocs = 0;
@@ -464,7 +466,6 @@ int main(int argc, char* argv[])
 
               //realloc data_raport
               data_raport = (struct dataraport*)realloc(data_raport, (reallocs * consumer_max) * sizeof(struct dataraport));
-              //realloc
             }
 
             //struct for sockaddress
@@ -496,7 +497,7 @@ int main(int argc, char* argv[])
             write(raport_fd, rapo, sizeof(rapo));
           }
 
-          //każda dalsza ilość fds, trzeba przeleciec wszystkie
+          //other fds
           if(returned_fds > 0)
           {
             for(int i = 0; i < consumer_counter; i++)
@@ -509,7 +510,6 @@ int main(int argc, char* argv[])
 
                 q_push(pfds[i+3].fd);
 
-                char temp[1026];
                 data_raport[i].data_blocks++; //requested
 
                 returned_fds--;
@@ -525,7 +525,7 @@ int main(int argc, char* argv[])
 
                 pfds[i+3].events = 0;
                 pfds[i+3].revents = 0;
-                //shutdown(pfds[i+3].fd, 2);
+                shutdown(pfds[i+3].fd, 2);
 
                 connected--;
               }
@@ -535,7 +535,6 @@ int main(int argc, char* argv[])
           // try to send as much data as we can
         if((q_size > 0) & (connected > 0) & (cb->capacity > (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE)))
         {
-          printf("%d, %d\n", cb->capacity*GEN_BLOCK_SIZE, SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
           int available = q_size;
           if(q_size > cb->capacity)
             {
@@ -550,7 +549,7 @@ int main(int argc, char* argv[])
             memset(send_b, 0, SEN_BLOCK_SIZE);
 
             cb_pop(cb, send_b);
-            printf("sending... size: %ld\n", sizeof(send_b));
+
             send(cfd, send_b, sizeof(send_b), 0);
           }
         }

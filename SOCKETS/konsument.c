@@ -144,8 +144,8 @@ void gen_raport(struct dataraport* data_r, int cnt)
     {
         fprintf(stderr, " \t********** BLOCK NO %d **********\n", i+1);
         fprintf(stderr, " -> Diff between sending mes and reading: %ldsec, %ldnsec\n", data_r[i].delay_a.tv_sec, data_r[i].delay_a.tv_nsec);
-        fprintf(stderr, " -> Diff between start & end of reading: %ldsec, %ldnsec\n\n", data_r[i].delay_b.tv_sec, data_r[i].delay_b.tv_nsec);
-        fprintf(stderr, " -> MD5SUM: %s\n", data_r[i].md5_final);
+        fprintf(stderr, " -> Diff between start & end of reading: %ldsec, %ldnsec\n", data_r[i].delay_b.tv_sec, data_r[i].delay_b.tv_nsec);
+        fprintf(stderr, " -> MD5SUM: %s\n\n", data_r[i].md5_final);
     }
 }
 
@@ -191,7 +191,6 @@ int main(int argc, char* argv[])
 
               //convert to float
               dly = convert_to_float(first_p, second_p);
-              printf("%lf\n", dly);
 
               break;
           case 's':
@@ -317,9 +316,8 @@ int main(int argc, char* argv[])
                 clock_gettime(CLOCK_REALTIME, &clock_times[2]);
 
                 int r = read(consumer_fd, read_data, SEN_BLOCK_SIZE);
-                printf("%d\n", r);
-                //if(r > 0)
-                  //recived++;
+
+                //check if we recived all bytes we wanted
                 if(r == SEN_BLOCK_SIZE)
                 {
                   recived++;
@@ -334,28 +332,23 @@ int main(int argc, char* argv[])
                     check_r = 0;
                   }
                 }
-                printf("%d, %d, %d\n", check_r, r, recived);
 
                 clock_gettime(CLOCK_REALTIME, &clock_times[3]);
 
                 //create md5sum
-                /*unsigned char md5_final[16];
+                unsigned char md5_final[16];
                 MD5_CTX contx;
                 MD5_Init(&contx);
                 MD5_Update(&contx, read_data, sizeof(read_data));
                 MD5_Final(md5_final, &contx);
 
                 /********* ADD TO DATA RAPORT STRUCTURE  *********/
-                //add_to_dataraport(data_r, md5_final, ticks_counter-1, clock_times);
+                add_to_dataraport(data_r, md5_final, ticks_counter-1, clock_times);
             }
-            /*else if(pfds[1].revents == (POLLIN | POLLHUP | POLLERR)) //if some error occured
-            {
-              continue;
-            }*/
         }
     }
 
-    //gen_raport(data_r, cnt);
+    gen_raport(data_r, cnt);
 
     close(timer_fd);
     shutdown(consumer_fd, 2);
