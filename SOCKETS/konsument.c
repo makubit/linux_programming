@@ -256,7 +256,7 @@ int main(int argc, char* argv[])
     A.sin_family = AF_INET;
     A.sin_port = htons(port_addr);
 
-    if(inet_aton("127.0.0.2", &A.sin_addr) == -1)
+    if(inet_aton("127.0.0.1", &A.sin_addr) == -1)
     {
         perror("Inet aton error: Invalid address or address not supported\n");
         exit(EXIT_FAILURE);
@@ -285,6 +285,7 @@ int main(int argc, char* argv[])
 
     int ticks_counter = 0;
     int recived = 0;
+    int check_r = 0; //to check if we recived all data we wanted
 
     while(recived < cnt)
     {
@@ -292,16 +293,22 @@ int main(int argc, char* argv[])
 
         if(returned_fds > 0)
         {
-            if(pfds[0].revents == POLLIN)
-            {
+          if(ticks_counter < cnt)
+          {
+              if(pfds[0].revents == POLLIN)
+              {
                 read(timer_fd, &timer_ticks, sizeof(timer_ticks));
 
-                if(TIMER_LOCATION)
                 for(int i = 0; i < timer_ticks; i++)
                     send(consumer_fd, send_s, sizeof(send_s), 0);
 
                 clock_gettime(CLOCK_REALTIME, &clock_times[0]);
                 ticks_counter++;
+              }
+            }
+          else
+            {
+              close(timer_fd);
             }
 
             if(pfds[1].revents == POLLIN)
@@ -309,33 +316,46 @@ int main(int argc, char* argv[])
                 clock_gettime(CLOCK_REALTIME, &clock_times[1]);
                 clock_gettime(CLOCK_REALTIME, &clock_times[2]);
 
-                int r = read(consumer_fd, read_data, sizeof(read_data));
-                if(r > 0)
+                int r = read(consumer_fd, read_data, SEN_BLOCK_SIZE);
+                printf("%d\n", r);
+                //if(r > 0)
+                  //recived++;
+                if(r == SEN_BLOCK_SIZE)
+                {
                   recived++;
+                }
+                else if(r > 0)
+                {
+                  check_r +=r;
 
-                printf("recived data...\n");
+                  if(check_r == SEN_BLOCK_SIZE)
+                  {
+                    recived++;
+                    check_r = 0;
+                  }
+                }
+                printf("%d, %d, %d\n", check_r, r, recived);
 
                 clock_gettime(CLOCK_REALTIME, &clock_times[3]);
 
                 //create md5sum
-                unsigned char md5_final[16];
+                /*unsigned char md5_final[16];
                 MD5_CTX contx;
                 MD5_Init(&contx);
                 MD5_Update(&contx, read_data, sizeof(read_data));
                 MD5_Final(md5_final, &contx);
 
                 /********* ADD TO DATA RAPORT STRUCTURE  *********/
-                add_to_dataraport(data_r, md5_final, ticks_counter-1, clock_times);
+                //add_to_dataraport(data_r, md5_final, ticks_counter-1, clock_times);
             }
-            else if(pfds[1].revents == (POLLIN | POLLHUP | POLLERR)) //if some error occured
+            /*else if(pfds[1].revents == (POLLIN | POLLHUP | POLLERR)) //if some error occured
             {
-              close(consumer_fd);
-              break;
-            }
+              continue;
+            }*/
         }
     }
 
-    gen_raport(data_r, cnt);
+    //gen_raport(data_r, cnt);
 
     close(timer_fd);
     shutdown(consumer_fd, 2);

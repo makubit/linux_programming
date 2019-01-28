@@ -363,7 +363,7 @@ int main(int argc, char* argv[])
     A.sin_family = AF_INET;
     A.sin_port = htons(port_addr);
 
-    if(inet_aton("127.0.0.2", &A.sin_addr) == -1)
+    if(inet_aton("127.0.0.1", &A.sin_addr) == -1)
     {
         perror("Aton inet error: Invalid address or address not supported\n");
         exit(EXIT_FAILURE);
@@ -496,27 +496,6 @@ int main(int argc, char* argv[])
             write(raport_fd, rapo, sizeof(rapo));
           }
 
-          /*if((q_size > 0) & (connected > 0) & (cb->capacity > SEN_BLOCK_SIZE/GEN_BLOCK_SIZE))
-          {
-            int available = q_size;
-            if(q_size > cb->capacity)
-              {
-                available = cb->capacity;
-              }
-
-            for(int j = 0; j < available; j++) // /192
-            {
-              int cfd = q_pop();
-
-              char send_b[SEN_BLOCK_SIZE]; //SEN_BLOCK_SIZE
-              memset(send_b, 0, SEN_BLOCK_SIZE);
-
-              cb_pop(cb, send_b);
-              printf("sending...\n");
-              send(cfd, send_b, sizeof(send_b), 0);
-            }
-          }*/
-
           //każda dalsza ilość fds, trzeba przeleciec wszystkie
           if(returned_fds > 0)
           {
@@ -528,9 +507,6 @@ int main(int argc, char* argv[])
                 char recvmes[4];
                 read(pfds[i+3].fd, recvmes, sizeof(recvmes));
 
-                //TODO: sprawdzić, czy wygenerowalismy odpowiednia ilosc danych, jak nie to robimy break, żeby się wygenerowały
-                // jeżeli nie, ustawiamy wszystkie .events na 0, jak sie wygeneruje już, to spowrotem na IN
-                //send(pfds[i+3].fd, s, sizeof(s), 0 ); //powinno być osobno, pod tym ifem, jeżeli w kolejce, to wysylamy
                 q_push(pfds[i+3].fd);
 
                 char temp[1026];
@@ -549,63 +525,41 @@ int main(int argc, char* argv[])
 
                 pfds[i+3].events = 0;
                 pfds[i+3].revents = 0;
-                shutdown(pfds[i+3].fd, 2);
-                //close(pfds[i+3].fd);
+                //shutdown(pfds[i+3].fd, 2);
 
                 connected--;
               }
             }
-
-            // try to send as much data as we can
-            //to chyba musi byc wyzej, żeby connected sie nie zerowalo przed skonczeniem wysylania
-            /*if((q_size > 0) & (connected > 0) & (cb->capacity > SEN_BLOCK_SIZE/GEN_BLOCK_SIZE))
-            {
-              int available = q_size;
-              if(q_size > cb->capacity)
-                {
-                  available = cb->capacity;
-                }
-
-              for(int j = 0; j < available; j++) // /192
-              {
-                int cfd = q_pop();
-
-                char send_b[SEN_BLOCK_SIZE]; //SEN_BLOCK_SIZE
-                memset(send_b, 0, SEN_BLOCK_SIZE);
-
-                cb_pop(cb, send_b);
-                printf("sending...\n");
-                send(cfd, send_b, sizeof(send_b), 0);
-              }
-            }*/
           }
-          if((q_size > 0) & (connected > 0) & (cb->capacity > SEN_BLOCK_SIZE/GEN_BLOCK_SIZE))
-          {
-            int available = q_size;
-            if(q_size > cb->capacity)
-              {
-                available = cb->capacity;
-              }
 
-            for(int j = 0; j < available; j++) // /192
+          // try to send as much data as we can
+        if((q_size > 0) & (connected > 0) & (cb->capacity > (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE)))
+        {
+          printf("%d, %d\n", cb->capacity*GEN_BLOCK_SIZE, SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
+          int available = q_size;
+          if(q_size > cb->capacity)
             {
-              int cfd = q_pop();
-
-              char send_b[SEN_BLOCK_SIZE]; //SEN_BLOCK_SIZE
-              memset(send_b, 0, SEN_BLOCK_SIZE);
-
-              cb_pop(cb, send_b);
-              printf("sending...\n");
-              send(cfd, send_b, sizeof(send_b), 0);
+              available = cb->capacity;
             }
+
+          for(int j = 0; j < available; j++) // /192
+          {
+            int cfd = q_pop();
+
+            char send_b[SEN_BLOCK_SIZE]; //SEN_BLOCK_SIZE
+            memset(send_b, 0, SEN_BLOCK_SIZE);
+
+            cb_pop(cb, send_b);
+            printf("sending... size: %ld\n", sizeof(send_b));
+            send(cfd, send_b, sizeof(send_b), 0);
           }
+        }
       }
     }
 
     close(dtimer_fd);
     close(rtimer_fd);
     close(producer_fd);
-
 
     return 0;
 }
