@@ -228,7 +228,7 @@ int main(int argc, char* argv[])
     port_addr = convert_address(argv[optind]);
 
    /******************************************
-   * BUFFER TODO:
+   * INIT BUFFER TODO:
    ******************************************/
     c_buff* cb;
     cb = malloc(sizeof(c_buff));
@@ -350,6 +350,7 @@ int main(int argc, char* argv[])
           {
             read(dtimer_fd, &dtimer_ticks, sizeof(dtimer_ticks));
 
+            //for loop
             cb_push(cb, 'A');
 
             dticks_counter++;
