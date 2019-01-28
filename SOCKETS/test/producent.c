@@ -83,12 +83,12 @@ struct dataraport {
  char* cb_pop(c_buff* cbuf, char* data)
  {
      int idx = (cbuf->tail) % cbuf->max;
-     cbuf->capacity-=(SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
+     cbuf->capacity--;
      cbuf->sold++;
 
      for(int i = 0; i < (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE); i++) //192 blokow 640 == 112KB
      {
-       strcat(data, cbuf->buffer[idx++].buffer);
+       strcat(data, cbuf->buffer[idx].buffer);
      }
 
        cbuf->tail += SEN_BLOCK_SIZE/GEN_BLOCK_SIZE;
@@ -100,7 +100,7 @@ struct dataraport {
   * CUSTOMERS QUEUE
   ****************************************************/
 
-struct customers_q
+  struct customers_q
 {
    int fd; //for fd
    struct customers_q* next; /* pointer to next item */
@@ -123,7 +123,6 @@ void q_push(int fd)
            first = tempItem;
    else
            (*queue).next = tempItem;
-
    queue = tempItem;
 }
 
@@ -200,6 +199,7 @@ int convert_address(char* addr)
     display_help();
     exit(EXIT_FAILURE);
   }
+
   return temp;
 }
 
@@ -304,6 +304,8 @@ int main(int argc, char* argv[])
       exit(EXIT_FAILURE);
     }
 
+    printf("%ld, %ld\n", (long)(pace_val), (long)(pace_val * NANOSEC) % NANOSEC);
+
     port_addr = convert_address(argv[optind]);
 
    /******************************************
@@ -312,6 +314,8 @@ int main(int argc, char* argv[])
     c_buff* cb;
     cb = malloc(sizeof(c_buff)); //1 general buffer
     cb_init(cb, BUFF_SIZE);
+
+    printf("%ld, %ld\n", (long)(pace_val), (long)(pace_val * NANOSEC) % NANOSEC);
 
     /************** CREATE RAPORT FILE ********************/
     mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
@@ -534,12 +538,12 @@ int main(int argc, char* argv[])
           }
 
           // try to send as much data as we can
-        if((q_size > 0) & (cb->capacity > ((SEN_BLOCK_SIZE/GEN_BLOCK_SIZE) + 1)))
+        if((q_size > 0) & (connected > 0) & (cb->capacity > (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE + 1)))
         {
           int can_send = q_size;
-          if((q_size*SEN_BLOCK_SIZE) > (cb->capacity*GEN_BLOCK_SIZE))
+          if(q_size > (cb->capacity*(SEN_BLOCK_SIZE/GEN_BLOCK_SIZE)))
             {
-              can_send = cb->capacity/(SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
+              can_send = (cb->capacity*(SEN_BLOCK_SIZE/GEN_BLOCK_SIZE));
             }
 
             printf("cap: %d, q_size: %d, can send: %d\n", cb->capacity, q_size, can_send);
