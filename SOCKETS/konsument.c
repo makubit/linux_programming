@@ -12,9 +12,9 @@
 #include <poll.h>
 #include <sys/timerfd.h>
 #include <openssl/md5.h>
+#include <arpa/inet.h>
 #include <time.h>
 
-//#define BUFFER_SIZE112 112*1000
 #define NANOSEC 1000000
 #define TIMER_LOCATION 1 //-r: 1, -s: 0
 #define SEN_BLOCK_SIZE 112*1024
@@ -145,6 +145,7 @@ void gen_raport(struct dataraport* data_r, int cnt)
         fprintf(stderr, " \t********** BLOCK NO %d **********\n", i+1);
         fprintf(stderr, " -> Diff between sending mes and reading: %ldsec, %ldnsec\n", data_r[i].delay_a.tv_sec, data_r[i].delay_a.tv_nsec);
         fprintf(stderr, " -> Diff between start & end of reading: %ldsec, %ldnsec\n\n", data_r[i].delay_b.tv_sec, data_r[i].delay_b.tv_nsec);
+        fprintf(stderr, " -> MD5SUM: %s\n", data_r[i].md5_final);
     }
 }
 
@@ -283,10 +284,9 @@ int main(int argc, char* argv[])
     pfds[1].events = POLLIN;
 
     int ticks_counter = 0;
-    //while(ticks_counter <= BLOCKS)
-    //for(int i = 0; i<cnt*2; i++)
     int recived = 0;
-    while(recived <= cnt)
+
+    while(recived < cnt)
     {
         returned_fds = poll(pfds, 2, 5000);
 
@@ -313,7 +313,7 @@ int main(int argc, char* argv[])
                 if(r > 0)
                   recived++;
 
-                printf("%s\n", read_data);
+                printf("recived data...\n");
 
                 clock_gettime(CLOCK_REALTIME, &clock_times[3]);
 
@@ -326,6 +326,11 @@ int main(int argc, char* argv[])
 
                 /********* ADD TO DATA RAPORT STRUCTURE  *********/
                 add_to_dataraport(data_r, md5_final, ticks_counter-1, clock_times);
+            }
+            else if(pfds[1].revents == (POLLIN | POLLHUP | POLLERR)) //if some error occured
+            {
+              close(consumer_fd);
+              break;
             }
         }
     }

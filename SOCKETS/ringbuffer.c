@@ -95,13 +95,22 @@ char* t = malloc(100);
   //memcpy(t[6], t2, strlen(t2));
   strcat(t, t2);
   printf("%s\n", t);*/
-
   char* str_loop = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ";
 
-  char* s= "abcdefghijk";
-  while(*s != '\0')
-    printf("%c\n", *s++); //!!!!!!!!!!!!!!!!!!!!1 jej
+  char* str_prod_point = str_loop;
+  while(1)
+  {
 
 
+    if(*str_prod_point == '\0')
+      str_prod_point = str_loop;
+
+    printf("%c\n", *str_prod_point);
+
+    str_prod_point++;
+
+    sleep(1);
+
+}
   return 0;
 }

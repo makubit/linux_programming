@@ -53,7 +53,7 @@ struct dataraport {
 
  void cb_init(c_buff* cbuf, int max)
  {
-     cbuf->buffer = malloc(max/GEN_BLOCK_SIZE); //1,25MB
+     cbuf->buffer = malloc(max); //1,25MB
      cbuf->capacity = 0; //ile mamy na stanie
      cbuf->head = 0;
      cbuf->tail = 0;
@@ -83,14 +83,12 @@ struct dataraport {
      cbuf->capacity--;
      cbuf->sold++;
 
-     //for(int i = 0; i < (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE); i++) //192 blokow 640 == 112KB
-     //for(int i = 0; i < 1; i++)
-     //{
-       //strcat(temp, cbuf->buffer[cbuf->tail++].buffer);
+     for(int i = 0; i < (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE); i++) //192 blokow 640 == 112KB
+     {
        strcat(data, cbuf->buffer[idx].buffer);
-     //}
+     }
 
-       cbuf->tail +=1;//SEN_BLOCK_SIZE/GEN_BLOCK_SIZE;
+       cbuf->tail += SEN_BLOCK_SIZE/GEN_BLOCK_SIZE;
 
      return data;
  }
@@ -220,7 +218,7 @@ void generate_raport(char* raport, c_buff* cb)
   strcat(raport, temp);
   sprintf(temp, " -> Connected: %d\n", connected);
   strcat(raport, temp);
-  sprintf(temp, " -> In stock: %d\n -> In last 5 secs generated: %d, sold: %d\n\n", cb->capacity*GEN_BLOCK_SIZE, cb->generated*GEN_BLOCK_SIZE, cb->sold*SEN_BLOCK_SIZE);
+  sprintf(temp, " -> In stock: %d :: Percentage-wise: %lf \n -> In last 5 secs generated: %d, sold: %d\n\n", cb->capacity*GEN_BLOCK_SIZE, (float)(cb->capacity)/(float)(cb->max), cb->generated*GEN_BLOCK_SIZE, cb->sold*SEN_BLOCK_SIZE);
   strcat(raport, temp);
 }
 
@@ -261,7 +259,7 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
   strcat(raport, temp);
   sprintf(temp, " -> IP Address: %s \n", data_raport.ip_addr);
   strcat(raport, temp);
-  sprintf(temp, " -> Ilosc przeslanych bloków: %d \n\n", data_raport.data_blocks-1);
+  sprintf(temp, " -> Ilosc przeslanych bloków: %d \n\n", data_raport.data_blocks);
   strcat(raport, temp);
 }
 
@@ -310,18 +308,6 @@ int main(int argc, char* argv[])
     c_buff* cb;
     cb = malloc(sizeof(c_buff)); //1 general buffer
     cb_init(cb, BUFF_SIZE);
-    //cb_push(cb, *str_loop++);
-    //char buf[1024];
-    //cb_pop(cb, buf);
-    /************* BUFFER TESTS ***************/
-    /*cb_push(cb, *str_loop++);
-    printf("%s\n", cb->buffer[0].buffer);
-    cb_push(cb, *str_loop++);
-    printf("%s\n", cb->buffer[1].buffer);
-    char buf[1024];
-    cb_pop(cb, buf);
-    printf("%s\n", buf);*/
-    /*****************************************/
 
     /************** CREATE RAPORT FILE ********************/
     mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
@@ -348,13 +334,6 @@ int main(int argc, char* argv[])
     dts.it_interval.tv_nsec = (long)(pace_val * NANOSEC) % NANOSEC;
     dts.it_value.tv_sec = (long)(pace_val);
     dts.it_value.tv_nsec = (long)(pace_val * NANOSEC) % NANOSEC;
-
-printf("%d. %d.\n", (long)(pace_val), (long)(pace_val * NANOSEC) % NANOSEC);
-
-    /*dts.it_interval.tv_sec = 1;
-    dts.it_interval.tv_nsec = 0;
-    dts.it_value.tv_sec = 1;
-    dts.it_value.tv_nsec = 0;*/
 
     rts.it_interval.tv_sec = 5;
     rts.it_interval.tv_nsec = 0;
@@ -420,6 +399,7 @@ printf("%d. %d.\n", (long)(pace_val), (long)(pace_val * NANOSEC) % NANOSEC);
     /************** CREATE DATA RAPORT STRUCTURE ***************/
     struct dataraport* data_raport;
     data_raport = malloc(sizeof(struct dataraport) * consumer_max);
+    char* str_prod_point = str_loop;
 
     /***********************************************************
     * MAIN LOOP
@@ -428,7 +408,7 @@ printf("%d. %d.\n", (long)(pace_val), (long)(pace_val * NANOSEC) % NANOSEC);
     while(PRODUCTION)
     {
       returned_fds = poll(pfds, 53, 5000);
-      //printf("returned: %d, size: %d\n", returned_fds, q_size);
+
       if(returned_fds > 0)
       {
           if(pfds[0].revents == POLLIN)
@@ -437,10 +417,12 @@ printf("%d. %d.\n", (long)(pace_val), (long)(pace_val * NANOSEC) % NANOSEC);
 
             //generate data to buffer
             for(int k = 0; k < dtimer_ticks; k++)
-              cb_push(cb, *str_loop++);
+            {
+              if(*str_prod_point == '\0')
+                str_prod_point = str_loop;
 
-            if(*str_loop == '\0')
-              PRODUCTION = 0;
+              cb_push(cb, *str_prod_point++);
+            }
 
             dticks_counter++;
             returned_fds--;
@@ -482,6 +464,7 @@ printf("%d. %d.\n", (long)(pace_val), (long)(pace_val * NANOSEC) % NANOSEC);
 
               //realloc data_raport
               data_raport = (struct dataraport*)realloc(data_raport, (reallocs * consumer_max) * sizeof(struct dataraport));
+              //realloc
             }
 
             //struct for sockaddress
@@ -513,6 +496,27 @@ printf("%d. %d.\n", (long)(pace_val), (long)(pace_val * NANOSEC) % NANOSEC);
             write(raport_fd, rapo, sizeof(rapo));
           }
 
+          /*if((q_size > 0) & (connected > 0) & (cb->capacity > SEN_BLOCK_SIZE/GEN_BLOCK_SIZE))
+          {
+            int available = q_size;
+            if(q_size > cb->capacity)
+              {
+                available = cb->capacity;
+              }
+
+            for(int j = 0; j < available; j++) // /192
+            {
+              int cfd = q_pop();
+
+              char send_b[SEN_BLOCK_SIZE]; //SEN_BLOCK_SIZE
+              memset(send_b, 0, SEN_BLOCK_SIZE);
+
+              cb_pop(cb, send_b);
+              printf("sending...\n");
+              send(cfd, send_b, sizeof(send_b), 0);
+            }
+          }*/
+
           //każda dalsza ilość fds, trzeba przeleciec wszystkie
           if(returned_fds > 0)
           {
@@ -521,19 +525,15 @@ printf("%d. %d.\n", (long)(pace_val), (long)(pace_val * NANOSEC) % NANOSEC);
               if(pfds[i+3].revents == POLLIN)
               {
                 //consumer sends 4 bytes
-                printf("tutaj\n");
                 char recvmes[4];
                 read(pfds[i+3].fd, recvmes, sizeof(recvmes));
-                char* s = "1991";
 
                 //TODO: sprawdzić, czy wygenerowalismy odpowiednia ilosc danych, jak nie to robimy break, żeby się wygenerowały
                 // jeżeli nie, ustawiamy wszystkie .events na 0, jak sie wygeneruje już, to spowrotem na IN
                 //send(pfds[i+3].fd, s, sizeof(s), 0 ); //powinno być osobno, pod tym ifem, jeżeli w kolejce, to wysylamy
                 q_push(pfds[i+3].fd);
-                printf("client fd: %d\n", queue->fd);
 
                 char temp[1026];
-                //cb_pop(cb, temp);
                 data_raport[i].data_blocks++; //requested
 
                 returned_fds--;
@@ -550,7 +550,7 @@ printf("%d. %d.\n", (long)(pace_val), (long)(pace_val * NANOSEC) % NANOSEC);
                 pfds[i+3].events = 0;
                 pfds[i+3].revents = 0;
                 shutdown(pfds[i+3].fd, 2);
-                close(pfds[i+3].fd);
+                //close(pfds[i+3].fd);
 
                 connected--;
               }
@@ -558,7 +558,7 @@ printf("%d. %d.\n", (long)(pace_val), (long)(pace_val * NANOSEC) % NANOSEC);
 
             // try to send as much data as we can
             //to chyba musi byc wyzej, żeby connected sie nie zerowalo przed skonczeniem wysylania
-            if((q_size > 0) & (connected > 0) & (cb->capacity > 0))
+            /*if((q_size > 0) & (connected > 0) & (cb->capacity > SEN_BLOCK_SIZE/GEN_BLOCK_SIZE))
             {
               int available = q_size;
               if(q_size > cb->capacity)
@@ -574,9 +574,29 @@ printf("%d. %d.\n", (long)(pace_val), (long)(pace_val * NANOSEC) % NANOSEC);
                 memset(send_b, 0, SEN_BLOCK_SIZE);
 
                 cb_pop(cb, send_b);
-                printf("sending\n");
+                printf("sending...\n");
                 send(cfd, send_b, sizeof(send_b), 0);
               }
+            }*/
+          }
+          if((q_size > 0) & (connected > 0) & (cb->capacity > SEN_BLOCK_SIZE/GEN_BLOCK_SIZE))
+          {
+            int available = q_size;
+            if(q_size > cb->capacity)
+              {
+                available = cb->capacity;
+              }
+
+            for(int j = 0; j < available; j++) // /192
+            {
+              int cfd = q_pop();
+
+              char send_b[SEN_BLOCK_SIZE]; //SEN_BLOCK_SIZE
+              memset(send_b, 0, SEN_BLOCK_SIZE);
+
+              cb_pop(cb, send_b);
+              printf("sending...\n");
+              send(cfd, send_b, sizeof(send_b), 0);
             }
           }
       }
