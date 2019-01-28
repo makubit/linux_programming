@@ -63,6 +63,8 @@ void pop()
 int main(int argc, char* argv[])
 {
 
+  while(queue) //for na ilosci wyprodukowanych rzeczy
+     pop();
 
 
   return 0;

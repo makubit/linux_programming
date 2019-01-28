@@ -16,11 +16,10 @@
 #include <fcntl.h>
 #include <arpa/inet.h>
 
-//#define PORT 12345
 #define NANOSEC 1000000
 #define BUFF_SIZE 1024*1024*1.25
 #define GEN_BLOCK_SIZE 640
-#define SEN_BLOCK_SIZE 120*1024
+#define SEN_BLOCK_SIZE 112*1024
 // :640 = 192
 
 static char* str_loop = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ";
@@ -68,34 +67,88 @@ struct dataraport {
      int idx = (cbuf->head) % cbuf->max;
 
      if(cbuf->capacity == cbuf->max)
-         cbuf->tail++; //nadpisujemy dane
+         cbuf->tail++;
      cbuf->head++;
      cbuf->capacity++;
      cbuf->generated++;
 
-     //dodajemy pojedyncze 640bajtów
+     //add 640 bytes
      cbuf->buffer[idx].buffer = malloc(GEN_BLOCK_SIZE);
      memset(cbuf->buffer[idx].buffer, data, GEN_BLOCK_SIZE);
  }
 
- char* cb_pop(c_buff* cbuf, char* temp)
+ char* cb_pop(c_buff* cbuf, char* data)
  {
      int idx = (cbuf->tail) % cbuf->max;
      cbuf->capacity--;
      cbuf->sold++;
 
      //for(int i = 0; i < (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE); i++) //192 blokow 640 == 112KB
-     for(int i = 0; i < 1; i++)
-     {
+     //for(int i = 0; i < 1; i++)
+     //{
        //strcat(temp, cbuf->buffer[cbuf->tail++].buffer);
-       strcat(temp, cbuf->buffer[idx++].buffer);
-     }
+       strcat(data, cbuf->buffer[idx].buffer);
+     //}
 
-       cbuf->tail += 192;
+       cbuf->tail +=1;//SEN_BLOCK_SIZE/GEN_BLOCK_SIZE;
 
-     return temp;
+     return data;
  }
 
+ /*****************************************************
+  * CUSTOMERS QUEUE
+  ****************************************************/
+
+  struct customers_q
+{
+   int fd; //for fd
+   struct customers_q* next; /* pointer to next item */
+};
+
+/* Create our queue */
+struct customers_q* queue = NULL;
+struct customers_q* tempItem = NULL;
+struct customers_q* first  = NULL;
+
+static int q_size = 0;
+
+/* Functions to manage queue */
+void q_push(int fd)
+{
+   q_size++;
+   tempItem = (struct customers_q*)malloc(sizeof(struct customers_q));
+   (*tempItem).fd = fd;
+   if(queue == NULL)
+           first = tempItem;
+   else
+           (*queue).next = tempItem;
+   queue = tempItem;
+}
+
+int q_pop()
+{
+   if(first != NULL)
+   {
+      q_size--;
+      int temp_fd = first->fd;
+      tempItem = (*first).next;
+
+      //free(first);
+      first = tempItem;
+      if(first == NULL)
+              queue = NULL;
+
+      return temp_fd;
+   }
+   else
+   {
+     printf("Customers queue is empty, cannot pop...\n");
+     return -1;
+   }
+}
+
+//------------------------------------------------------
+//------------------------------------------------------
 //------------------------------------------------------
 
 void display_help()
@@ -296,6 +349,13 @@ int main(int argc, char* argv[])
     dts.it_value.tv_sec = (long)(pace_val);
     dts.it_value.tv_nsec = (long)(pace_val * NANOSEC) % NANOSEC;
 
+printf("%d. %d.\n", (long)(pace_val), (long)(pace_val * NANOSEC) % NANOSEC);
+
+    /*dts.it_interval.tv_sec = 1;
+    dts.it_interval.tv_nsec = 0;
+    dts.it_value.tv_sec = 1;
+    dts.it_value.tv_nsec = 0;*/
+
     rts.it_interval.tv_sec = 5;
     rts.it_interval.tv_nsec = 0;
     rts.it_value.tv_sec = 5;
@@ -367,8 +427,8 @@ int main(int argc, char* argv[])
 
     while(PRODUCTION)
     {
-      returned_fds = poll(pfds, 10, 5000);
-
+      returned_fds = poll(pfds, 53, 5000);
+      //printf("returned: %d, size: %d\n", returned_fds, q_size);
       if(returned_fds > 0)
       {
           if(pfds[0].revents == POLLIN)
@@ -376,7 +436,8 @@ int main(int argc, char* argv[])
             read(dtimer_fd, &dtimer_ticks, sizeof(dtimer_ticks));
 
             //generate data to buffer
-            cb_push(cb, *str_loop++);
+            for(int k = 0; k < dtimer_ticks; k++)
+              cb_push(cb, *str_loop++);
 
             if(*str_loop == '\0')
               PRODUCTION = 0;
@@ -459,19 +520,21 @@ int main(int argc, char* argv[])
             {
               if(pfds[i+3].revents == POLLIN)
               {
-                //konsument wysłał, sprawdzamy, czy 4 bajty, jak tak, to wysyłamy porcję danych
+                //consumer sends 4 bytes
+                printf("tutaj\n");
                 char recvmes[4];
-                char* s = "cos tam\n";
                 read(pfds[i+3].fd, recvmes, sizeof(recvmes));
+                char* s = "1991";
 
                 //TODO: sprawdzić, czy wygenerowalismy odpowiednia ilosc danych, jak nie to robimy break, żeby się wygenerowały
                 // jeżeli nie, ustawiamy wszystkie .events na 0, jak sie wygeneruje już, to spowrotem na IN
-                send(pfds[i+3].fd, s, sizeof(s), 0 ); //powinno być osobno, pod tym ifem, jeżeli w kolejce, to wysylamy
+                //send(pfds[i+3].fd, s, sizeof(s), 0 ); //powinno być osobno, pod tym ifem, jeżeli w kolejce, to wysylamy
+                q_push(pfds[i+3].fd);
+                printf("client fd: %d\n", queue->fd);
 
                 char temp[1026];
                 //cb_pop(cb, temp);
-                //add 1 block to structure
-                data_raport[i].data_blocks++;
+                data_raport[i].data_blocks++; //requested
 
                 returned_fds--;
                 if(returned_fds == 0) //when we read all fds no need to continue
@@ -486,20 +549,37 @@ int main(int argc, char* argv[])
 
                 pfds[i+3].events = 0;
                 pfds[i+3].revents = 0;
+                shutdown(pfds[i+3].fd, 2);
                 close(pfds[i+3].fd);
 
                 connected--;
               }
             }
 
-            //tutaj bedzie pop z wysyłaniem wiadomości
-            //if capacity>112KB pop
-            //while(!pop)
+            // try to send as much data as we can
+            //to chyba musi byc wyzej, żeby connected sie nie zerowalo przed skonczeniem wysylania
+            if((q_size > 0) & (connected > 0) & (cb->capacity > 0))
+            {
+              int available = q_size;
+              if(q_size > cb->capacity)
+                {
+                  available = cb->capacity;
+                }
 
+              for(int j = 0; j < available; j++) // /192
+              {
+                int cfd = q_pop();
+
+                char send_b[SEN_BLOCK_SIZE]; //SEN_BLOCK_SIZE
+                memset(send_b, 0, SEN_BLOCK_SIZE);
+
+                cb_pop(cb, send_b);
+                printf("sending\n");
+                send(cfd, send_b, sizeof(send_b), 0);
+              }
+            }
           }
       }
-
-      sleep(1);
     }
 
     close(dtimer_fd);

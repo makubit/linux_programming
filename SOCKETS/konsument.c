@@ -14,9 +14,10 @@
 #include <openssl/md5.h>
 #include <time.h>
 
-#define BUFFER_SIZE112 112*1000
+//#define BUFFER_SIZE112 112*1000
 #define NANOSEC 1000000
 #define TIMER_LOCATION 1 //-r: 1, -s: 0
+#define SEN_BLOCK_SIZE 112*1024
 static char send_s[4] = { 's', 'e', 'n', 'd' };
 
 struct dataraport {
@@ -272,7 +273,7 @@ int main(int argc, char* argv[])
 
     /************** POLL **************/
     uint64_t timer_ticks;
-    char read_data[8];
+    char read_data[SEN_BLOCK_SIZE];
     int returned_fds = 0;
 
     struct pollfd pfds[2];
@@ -283,7 +284,9 @@ int main(int argc, char* argv[])
 
     int ticks_counter = 0;
     //while(ticks_counter <= BLOCKS)
-    for(int i = 0; i<cnt*2; i++)
+    //for(int i = 0; i<cnt*2; i++)
+    int recived = 0;
+    while(recived <= cnt)
     {
         returned_fds = poll(pfds, 2, 5000);
 
@@ -305,7 +308,13 @@ int main(int argc, char* argv[])
             {
                 clock_gettime(CLOCK_REALTIME, &clock_times[1]);
                 clock_gettime(CLOCK_REALTIME, &clock_times[2]);
-                read(consumer_fd, read_data, sizeof(read_data));
+
+                int r = read(consumer_fd, read_data, sizeof(read_data));
+                if(r > 0)
+                  recived++;
+
+                printf("%s\n", read_data);
+
                 clock_gettime(CLOCK_REALTIME, &clock_times[3]);
 
                 //create md5sum
