@@ -19,12 +19,8 @@
 //#define PORT 12345
 #define NANOSEC 1000000
 #define BUFF_SIZE 1024*1024*1.25
-#define GEN_BLOCK_SIZE 640
-#define SEN_BLOCK_SIZE 120*1024
-// :640 = 192
+#define DATA_SIZE 640
 
-static char* str_loop = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ";
-static int PRODUCTION = 1;
 static int connected = 0;
 
 struct dataraport {
@@ -37,64 +33,44 @@ struct dataraport {
  * CIRCULAR BUFFER
  ****************************************************/
 
- typedef struct buffer {
-   char* buffer;
- } buffer;
+typedef struct c_buff
+{
+    char* buffer;
+    int max;
+    int capacity;
+    int el_size;
+    size_t head;
+    int tail;
 
- typedef struct c_buff
- {
-     buffer* buffer;
-     int max;
-     int capacity;
-     size_t head;
-     int tail;
-     int generated;
-     int sold;
- } c_buff;
+} c_buff;
 
- void cb_init(c_buff* cbuf, int max)
- {
-     cbuf->buffer = malloc(max/GEN_BLOCK_SIZE); //1,25MB
-     cbuf->capacity = 0; //ile mamy na stanie
-     cbuf->head = 0;
-     cbuf->tail = 0;
-     cbuf->max = max/GEN_BLOCK_SIZE;
-     cbuf->generated = 0; //co 5 sekund zmiana
-     cbuf->sold = 0; //co 5 sekund zmiana
- }
+void cb_init(c_buff* cbuf, int max)
+{
+    cbuf->buffer = malloc(max);
+    cbuf->capacity = 0;
+    cbuf->el_size = 1;
+    cbuf->head = 0;
+    cbuf->tail = 0;
+    cbuf->max = max;
+}
 
- void cb_push(c_buff* cbuf, int data)
- {
-     int idx = (cbuf->head) % cbuf->max;
+void cb_push(c_buff* cbuf, int data)
+{
+    int idx = (cbuf->head) % cbuf->max;
 
-     if(cbuf->capacity == cbuf->max)
-         cbuf->tail++; //nadpisujemy dane
-     cbuf->head++;
-     cbuf->capacity++;
-     cbuf->generated++;
+    if(cbuf->capacity == cbuf->max)
+        cbuf->tail++;
+    cbuf->head++;
+    cbuf->buffer[idx] = data;
+}
 
-     //dodajemy pojedyncze 640bajtów
-     cbuf->buffer[idx].buffer = malloc(GEN_BLOCK_SIZE);
-     memset(cbuf->buffer[idx].buffer, data, GEN_BLOCK_SIZE);
- }
+int cb_pop(c_buff* cbuf)
+{
+    int idx = (cbuf->tail) % cbuf->max;
+    cbuf->tail++;
 
- char* cb_pop(c_buff* cbuf, char* temp)
- {
-     int idx = (cbuf->tail) % cbuf->max;
-     cbuf->capacity--;
-     cbuf->sold++;
-
-     //for(int i = 0; i < (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE); i++) //192 blokow 640 == 112KB
-     for(int i = 0; i < 1; i++)
-     {
-       //strcat(temp, cbuf->buffer[cbuf->tail++].buffer);
-       strcat(temp, cbuf->buffer[idx++].buffer);
-     }
-
-       cbuf->tail += 192;
-
-     return temp;
- }
+    return cbuf->buffer[idx];
+}
 
 //------------------------------------------------------
 
@@ -150,7 +126,7 @@ int convert_address(char* addr)
 }
 
 //-------------- RAPORTS ----------------
-void generate_raport(char* raport, c_buff* cb)
+void generate_raport(char* raport)
 {
   char temp[1024];
   memset(raport, 0, 1024);
@@ -167,7 +143,7 @@ void generate_raport(char* raport, c_buff* cb)
   strcat(raport, temp);
   sprintf(temp, " -> Connected: %d\n", connected);
   strcat(raport, temp);
-  sprintf(temp, " -> In stock: %d\n -> In last 5 secs generated: %d, sold: %d\n\n", cb->capacity*GEN_BLOCK_SIZE, cb->generated*GEN_BLOCK_SIZE, cb->sold*SEN_BLOCK_SIZE);
+  sprintf(temp, " -> Storage: \n\n");
   strcat(raport, temp);
 }
 
@@ -252,22 +228,21 @@ int main(int argc, char* argv[])
     port_addr = convert_address(argv[optind]);
 
    /******************************************
-   * INIT BUFFER
+   * INIT BUFFER TODO:
    ******************************************/
     c_buff* cb;
-    cb = malloc(sizeof(c_buff)); //1 general buffer
-    cb_init(cb, BUFF_SIZE);
-    //cb_push(cb, *str_loop++);
-    //char buf[1024];
-    //cb_pop(cb, buf);
+    cb = malloc(sizeof(c_buff));
+
+    cb_init(cb, 10);
+
     /************* BUFFER TESTS ***************/
-    /*cb_push(cb, *str_loop++);
-    printf("%s\n", cb->buffer[0].buffer);
-    cb_push(cb, *str_loop++);
-    printf("%s\n", cb->buffer[1].buffer);
-    char buf[1024];
-    cb_pop(cb, buf);
-    printf("%s\n", buf);*/
+    /*cb_push(cb, 'A');
+    char* c = "hro";
+    memcpy(&cb->buffer[1], c, strlen(c));
+    cb->head +=3;
+    memcpy(&cb->buffer[cb->head], c, strlen(c));
+    cb->head += strlen(c);
+    printf("%s %d\n", cb->buffer, cb->head);*/
     /*****************************************/
 
     /************** CREATE RAPORT FILE ********************/
@@ -354,8 +329,8 @@ int main(int argc, char* argv[])
     pfds[2].fd = producer_fd;
     pfds[2].events = POLLIN;
 
-    int dticks_counter = 0;
-    int rticks_counter = 0;
+    int dticks_counter = 0; //??
+    int rticks_counter = 0; //??
 
     /************** CREATE DATA RAPORT STRUCTURE ***************/
     struct dataraport* data_raport;
@@ -365,7 +340,7 @@ int main(int argc, char* argv[])
     * MAIN LOOP
     ***********************************************************/
 
-    while(PRODUCTION)
+    while(1)
     {
       returned_fds = poll(pfds, 10, 5000);
 
@@ -375,11 +350,8 @@ int main(int argc, char* argv[])
           {
             read(dtimer_fd, &dtimer_ticks, sizeof(dtimer_ticks));
 
-            //generate data to buffer
-            cb_push(cb, *str_loop++);
-
-            if(*str_loop == '\0')
-              PRODUCTION = 0;
+            //for loop
+            cb_push(cb, 'A');
 
             dticks_counter++;
             returned_fds--;
@@ -391,16 +363,15 @@ int main(int argc, char* argv[])
 
             char rapo[1024];
             memset(rapo, 0, sizeof(rapo));
-            generate_raport(rapo, cb);
+            generate_raport(rapo);
 
             write(raport_fd, rapo, sizeof(rapo));
 
             rticks_counter++;
             returned_fds--;
-
-            //set circle buffer vars = 0
-            cb->generated = 0;
-            cb->sold = 0;
+            //TODO: set circle buffer vars = 0
+            //cb->generated = 0;
+            //cb->sold = 0;
           }
 
           if(pfds[2].revents) //if some actions on this socket -> listen and connect
@@ -468,8 +439,6 @@ int main(int argc, char* argv[])
                 // jeżeli nie, ustawiamy wszystkie .events na 0, jak sie wygeneruje już, to spowrotem na IN
                 send(pfds[i+3].fd, s, sizeof(s), 0 ); //powinno być osobno, pod tym ifem, jeżeli w kolejce, to wysylamy
 
-                char temp[1026];
-                //cb_pop(cb, temp);
                 //add 1 block to structure
                 data_raport[i].data_blocks++;
 

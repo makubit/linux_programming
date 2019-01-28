@@ -96,6 +96,8 @@ char* t = malloc(100);
   strcat(t, t2);
   printf("%s\n", t);*/
 
+  char* str_loop = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ";
+
   char* s= "abcdefghijk";
   while(*s != '\0')
     printf("%c\n", *s++); //!!!!!!!!!!!!!!!!!!!!1 jej
