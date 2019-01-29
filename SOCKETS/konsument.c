@@ -112,7 +112,7 @@ int convert_address(char* addr)
 
 void add_to_dataraport(struct dataraport* data_r, unsigned char* md5_final, int ticks_counter, struct timespec* times)
 {
-    data_r[ticks_counter].md5_final = malloc(sizeof(md5_final));
+    data_r[ticks_counter].md5_final = (char*)malloc(sizeof(md5_final)); //!
     strcpy(data_r[ticks_counter].md5_final, (char*)md5_final);
 
     data_r[ticks_counter].delay_a.tv_sec = times[1].tv_sec - times[0].tv_sec;
@@ -167,7 +167,7 @@ int main(int argc, char* argv[])
       switch(c)
       {
           case '#':
-              tempbuff = malloc(sizeof(optarg));
+              tempbuff = (char*)malloc(sizeof(optarg));
               strcpy(tempbuff, optarg);
               first_p = strtok(tempbuff, ":");
               second_p = strtok(NULL, ":");
@@ -184,7 +184,7 @@ int main(int argc, char* argv[])
                   exit(EXIT_FAILURE);
               }
 
-              tempbuff = malloc(sizeof(optarg));
+              tempbuff = (char*)malloc(sizeof(optarg));
               strcpy(tempbuff, optarg);
               first_p = strtok(tempbuff, ":");
               second_p = strtok(NULL, ":");
@@ -201,7 +201,7 @@ int main(int argc, char* argv[])
                   exit(EXIT_FAILURE);
               }
 
-              tempbuff = malloc(sizeof(optarg));
+              tempbuff = (char*)malloc(sizeof(optarg));
               strcpy(tempbuff, optarg);
               first_p = strtok(tempbuff, ":");
               second_p = strtok(NULL, ":");

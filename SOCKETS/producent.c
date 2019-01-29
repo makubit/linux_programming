@@ -22,7 +22,7 @@
 #define SEN_BLOCK_SIZE 112*1024
 // :640 = 192
 
-static char* str_loop = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ";
+char* str_loop = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ";
 static int PRODUCTION = 1;
 static int START_PRODUCTION = 1;
 static int connected = 0;
@@ -37,11 +37,11 @@ struct dataraport {
  * CIRCULAR BUFFER
  ****************************************************/
 
- typedef struct buffer {
+ typedef struct tbuffer {
    char* buffer;
  } buffer;
 
- typedef struct c_buff
+ typedef struct tc_buff
  {
      buffer* buffer;
      int max;
@@ -54,7 +54,7 @@ struct dataraport {
 
  void cb_init(c_buff* cbuf, int max)
  {
-     cbuf->buffer = malloc(max); //1,25MB
+     cbuf->buffer = (buffer*)malloc(max); //1,25MB
      cbuf->capacity = 0; //ile mamy na stanie
      cbuf->head = 0;
      cbuf->tail = 0;
@@ -76,7 +76,7 @@ struct dataraport {
        cbuf->generated++;
 
        //add 640 bytes
-       cbuf->buffer[idx].buffer = malloc(GEN_BLOCK_SIZE);
+       cbuf->buffer[idx].buffer = (char*)malloc(GEN_BLOCK_SIZE);
        memset(cbuf->buffer[idx].buffer, data, GEN_BLOCK_SIZE);
      }
  }
@@ -286,11 +286,11 @@ int main(int argc, char* argv[])
       switch(c)
       {
           case 'r':
-              raport_path = malloc(sizeof(optarg));
+              raport_path = (char*)malloc(sizeof(optarg));
               strcpy(raport_path, optarg);
               break;
           case 't':
-              tempbuff = malloc(sizeof(optarg));
+              tempbuff = (char*)malloc(sizeof(optarg));
               strcpy(tempbuff, optarg);
               pace_val = convert_to_float18(tempbuff);
               break;
@@ -314,7 +314,7 @@ int main(int argc, char* argv[])
    * INIT BUFFER
    ******************************************/
     c_buff* cb;
-    cb = malloc(sizeof(c_buff)); //1 general buffer
+    cb = (c_buff*)malloc(sizeof(c_buff)); //1 general buffer
     cb_init(cb, BUFF_SIZE);
 
     /************** CREATE RAPORT FILE ********************/
@@ -405,7 +405,7 @@ int main(int argc, char* argv[])
 
     /************** CREATE DATA RAPORT STRUCTURE ***************/
     struct dataraport* data_raport;
-    data_raport = malloc(sizeof(struct dataraport) * consumer_max);
+    data_raport = (struct dataraport*)malloc(sizeof(struct dataraport) * consumer_max); //!
     char* str_prod_point = str_loop;
 
     /***********************************************************
@@ -544,7 +544,7 @@ int main(int argc, char* argv[])
           }
 
           // try to send as much data as we can
-        if((q_size > 0) & (cb->capacity > ((SEN_BLOCK_SIZE/GEN_BLOCK_SIZE) + 1)))
+        if((q_size > 0) & (connected > 0) & (cb->capacity > ((SEN_BLOCK_SIZE/GEN_BLOCK_SIZE) + 1)))
         {
           int can_send = q_size;
           if((q_size*SEN_BLOCK_SIZE) > (cb->capacity*GEN_BLOCK_SIZE))
