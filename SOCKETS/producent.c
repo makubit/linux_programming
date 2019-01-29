@@ -38,12 +38,12 @@ struct dataraport {
  ****************************************************/
 
  typedef struct tbuffer {
-   char* buffer;
+   char* in_buffer;
  } buffer;
 
  typedef struct tc_buff
  {
-     buffer* buffer;
+     buffer* buff;
      int max;
      int capacity;
      size_t head;
@@ -54,7 +54,7 @@ struct dataraport {
 
  void cb_init(c_buff* cbuf, int max)
  {
-     cbuf->buffer = (buffer*)malloc(max); //1,25MB
+     cbuf->buff = (buffer*)malloc(max); //1,25MB
      cbuf->capacity = 0; //ile mamy na stanie
      cbuf->head = 0;
      cbuf->tail = 0;
@@ -76,8 +76,8 @@ struct dataraport {
        cbuf->generated++;
 
        //add 640 bytes
-       cbuf->buffer[idx].buffer = (char*)malloc(GEN_BLOCK_SIZE);
-       memset(cbuf->buffer[idx].buffer, data, GEN_BLOCK_SIZE);
+       cbuf->buff[idx].in_buffer = (char*)malloc(GEN_BLOCK_SIZE);
+       memset(cbuf->buff[idx].in_buffer, data, GEN_BLOCK_SIZE);
      }
  }
 
@@ -89,7 +89,7 @@ struct dataraport {
 
      for(int i = 0; i < (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE); i++) //192 blokow 640 == 112KB
      {
-       strcat(data, cbuf->buffer[idx++].buffer);
+       strcat(data, cbuf->buff[idx++].in_buffer);
      }
 
        cbuf->tail += (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
@@ -518,6 +518,7 @@ int main(int argc, char* argv[])
                 //consumer sends 4 bytes
                 char recvmes[4];
                 read(pfds[i+3].fd, recvmes, sizeof(recvmes));
+                printf("%d\n", sizeof(recvmes));
 
                 q_push(pfds[i+3].fd);
 

@@ -292,10 +292,11 @@ int main(int argc, char* argv[])
 
         if(returned_fds > 0)
         {
-          if(ticks_counter < cnt)
+          if((ticks_counter-1) < cnt)
           {
               if(pfds[0].revents == POLLIN)
               {
+                printf("%d\n", ticks_counter);
                 read(timer_fd, &timer_ticks, sizeof(timer_ticks));
 
                 for(int i = 0; i < timer_ticks; i++)
@@ -349,6 +350,8 @@ int main(int argc, char* argv[])
     }
 
     gen_raport(data_r, cnt);
+
+    //free all data
 
     close(timer_fd);
     shutdown(consumer_fd, 2);
