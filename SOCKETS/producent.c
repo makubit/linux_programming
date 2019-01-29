@@ -15,6 +15,7 @@
 #include <sys/timerfd.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
+#include <sys/syscall.h>
 
 #define NANOSEC 1000000
 #define BUFF_SIZE 1024*1024*1.25
@@ -88,14 +89,12 @@ struct dataraport {
      cbuf->sold++;
 
      for(int i = 0; i < (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE); i++) //192 blokow 640 == 112KB
-     {
-       strcat(data, cbuf->buff[idx++].in_buffer);
-     }
+       snprintf(data, sizeof(cbuf->buff[idx++].in_buffer), "%s", cbuf->buff[idx++].in_buffer);
 
-       cbuf->tail += (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
+     cbuf->tail += (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
 
-       if(START_PRODUCTION == 0)
-        START_PRODUCTION = 1;
+     if(START_PRODUCTION == 0)
+     START_PRODUCTION = 1;
 
      return data;
  }
@@ -190,7 +189,7 @@ int convert_address(char* addr)
   int temp = 0;
   if(first_p == NULL)
   {
-    char* loc = "localhost";
+    char* loc = "localhost\0";
     for(int i=0; i< strlen(loc); i++)
         temp += loc[i];
 
@@ -210,8 +209,8 @@ int convert_address(char* addr)
 //-------------- RAPORTS ----------------
 void generate_raport(char* raport, c_buff* cb)
 {
-  char temp[1024];
-  memset(raport, 0, 1024);
+  char temp[2048];
+  memset(raport, 0, 2048);
   struct timespec t_mono;
   struct timespec t_real;
 
@@ -231,8 +230,8 @@ void generate_raport(char* raport, c_buff* cb)
 
 void gen_raport_1(char* raport, struct sockaddr_in B) //new connection
 {
-  char temp[1024];
-  memset(raport, 0, 1024);
+  char temp[2048];
+  memset(raport, 0, 2048);
   struct timespec t_mono;
   struct timespec t_real;
 
@@ -251,8 +250,8 @@ void gen_raport_1(char* raport, struct sockaddr_in B) //new connection
 
 void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
 {
-  char temp[1024];
-  memset(raport, 0, 1024);
+  char temp[2048];
+  memset(raport, 0, 2048);
   struct timespec t_mono;
   struct timespec t_real;
 
@@ -553,7 +552,7 @@ int main(int argc, char* argv[])
               can_send = cb->capacity/(SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
             }
 
-            printf("cap: %d, q_size: %d, can send: %d\n", cb->capacity, q_size, can_send);
+            printf("cap: %d, q_size: %d, can send: %d, who in q: %d\n", cb->capacity, q_size, can_send, queue->fd);
 
           for(int j = 0; j < can_send; j++) // /192
           {

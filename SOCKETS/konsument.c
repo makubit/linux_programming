@@ -292,7 +292,7 @@ int main(int argc, char* argv[])
 
         if(returned_fds > 0)
         {
-          if((ticks_counter-1) < cnt)
+          if((ticks_counter) < cnt)
           {
               if(pfds[0].revents == POLLIN)
               {
@@ -356,6 +356,7 @@ int main(int argc, char* argv[])
     close(timer_fd);
     shutdown(consumer_fd, 2);
     close(consumer_fd);
+    printf("Zamknieto\n");
 
     return 0;
 }
