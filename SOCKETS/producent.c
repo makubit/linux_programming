@@ -24,6 +24,7 @@
 
 static char* str_loop = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ";
 static int PRODUCTION = 1;
+static int START_PRODUCTION = 1;
 static int connected = 0;
 
 struct dataraport {
@@ -91,7 +92,10 @@ struct dataraport {
        strcat(data, cbuf->buffer[idx++].buffer);
      }
 
-       cbuf->tail += SEN_BLOCK_SIZE/GEN_BLOCK_SIZE;
+       cbuf->tail += (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
+
+       if(START_PRODUCTION == 0)
+        START_PRODUCTION = 1;
 
      return data;
  }
@@ -120,9 +124,9 @@ void q_push(int fd)
    tempItem = (struct customers_q*)malloc(sizeof(struct customers_q));
    (*tempItem).fd = fd;
    if(queue == NULL)
-           first = tempItem;
+      first = tempItem;
    else
-           (*queue).next = tempItem;
+      (*queue).next = tempItem;
 
    queue = tempItem;
 }
@@ -221,7 +225,7 @@ void generate_raport(char* raport, c_buff* cb)
   strcat(raport, temp);
   sprintf(temp, " -> Connected: %d\n", connected);
   strcat(raport, temp);
-  sprintf(temp, " -> In stock: %d :: Percentage-wise: %lf \n -> In last 5 secs generated: %d, sold: %d\n\n", cb->capacity*GEN_BLOCK_SIZE, (float)(cb->capacity)/(float)(cb->max), cb->generated*GEN_BLOCK_SIZE, cb->sold*SEN_BLOCK_SIZE);
+  sprintf(temp, " -> In stock: %d :: Percentage-wise: %.2lf%% \n -> In last 5 secs generated: %d, sold: %d\n\n", cb->capacity*GEN_BLOCK_SIZE, (float)(cb->capacity)/(float)(cb->max)*100, cb->generated*GEN_BLOCK_SIZE, cb->sold*SEN_BLOCK_SIZE);
   strcat(raport, temp);
 }
 
@@ -416,7 +420,9 @@ int main(int argc, char* argv[])
       {
           if(pfds[0].revents == POLLIN)
           {
-            read(dtimer_fd, &dtimer_ticks, sizeof(dtimer_ticks));
+            if(START_PRODUCTION)
+            {
+              read(dtimer_fd, &dtimer_ticks, sizeof(dtimer_ticks));
 
             //generate data to buffer
             for(int k = 0; k < dtimer_ticks; k++)
@@ -429,6 +435,10 @@ int main(int argc, char* argv[])
 
             dticks_counter++;
             returned_fds--;
+
+            if(cb->capacity == cb->max)
+              START_PRODUCTION = 0;
+            }
           }
 
           if(pfds[1].revents == POLLIN)

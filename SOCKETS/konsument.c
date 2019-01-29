@@ -317,7 +317,7 @@ int main(int argc, char* argv[])
 
                 int r = read(consumer_fd, read_data, SEN_BLOCK_SIZE);
 
-                //check if we recived all bytes we wanted
+                //check if we recived all bytes we wanted, than md5 and clock_gettime
                 if(r == SEN_BLOCK_SIZE)
                 {
                   recived++;
