@@ -1,4 +1,4 @@
-/* Konsument odbiera 112KB od producenta
+  /* Konsument odbiera 112KB od producenta
  * generuje md5
  * generuje raport */
 #include <stdlib.h>
@@ -296,7 +296,6 @@ int main(int argc, char* argv[])
           {
               if(pfds[0].revents == POLLIN)
               {
-                printf("%d\n", ticks_counter);
                 read(timer_fd, &timer_ticks, sizeof(timer_ticks));
 
                 for(int i = 0; i < timer_ticks; i++)
@@ -356,7 +355,6 @@ int main(int argc, char* argv[])
     close(timer_fd);
     shutdown(consumer_fd, 2);
     close(consumer_fd);
-    printf("Zamknieto\n");
 
     return 0;
 }

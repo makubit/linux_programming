@@ -517,7 +517,6 @@ int main(int argc, char* argv[])
                 //consumer sends 4 bytes
                 char recvmes[4];
                 read(pfds[i+3].fd, recvmes, sizeof(recvmes));
-                printf("%d\n", sizeof(recvmes));
 
                 q_push(pfds[i+3].fd);
 
@@ -551,8 +550,6 @@ int main(int argc, char* argv[])
             {
               can_send = cb->capacity/(SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
             }
-
-            printf("cap: %d, q_size: %d, can send: %d, who in q: %d\n", cb->capacity, q_size, can_send, queue->fd);
 
           for(int j = 0; j < can_send; j++) // /192
           {
