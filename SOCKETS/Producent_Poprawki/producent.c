@@ -273,72 +273,75 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
   strcat(raport, temp);
 }
 
+ void do_getopt(int argc, char* argv[], int* port, char** addr, char** raport_path, float* pace_val)
+ {
+   int c;
+   char* tempbuff = NULL;
+
+   while((c = getopt(argc, argv, "r:t:")) != -1)
+     {
+       switch(c)
+       {
+           case 'r':
+               *raport_path = (char*)malloc(sizeof(optarg));
+               strcpy(*raport_path, optarg);
+               break;
+           case 't':
+               tempbuff = (char*)malloc(sizeof(optarg));
+               strcpy(tempbuff, optarg);
+               *pace_val = convert_to_float18(tempbuff);
+               break;
+           case '?':
+               display_help();
+               break;
+           break;
+       }
+     }
+
+     if((*raport_path == NULL) || (*pace_val == 0) || (argv[optind] == NULL))
+     {
+       printf(" Mandatory parameters: -r <path>, -t <val>, [<addr>]:port\n");
+       display_help();
+       exit(EXIT_FAILURE);
+     }
+
+     //---------------------------------------------
+     if(argv[optind][0] == '[')
+     {
+       char* first_par = strtok(argv[optind], "[");
+       first_par = strtok(first_par, ":]");
+       char* second_par = strtok(0, ":]");
+       printf("%s\n", second_par);
+       strcpy(second_par, *addr);
+
+       *port = strtol(first_par, NULL, 0);
+
+       if(*port <= 0)
+       {
+         printf(" port error: wrong port number\n");
+         display_help();
+         exit(EXIT_FAILURE);
+       }
+     }
+     else {
+       *port = 12345;
+       strcpy(argv[optind], *addr);
+     }
+ }
+
 //----------------------------------------------------------
 //----------------------------------------------------------
 
 int main(int argc, char* argv[])
 {
-  int c;
-  char* tempbuff = NULL;
-  char* raport_path = NULL;
-  float pace_val = 0;
-  int port = 0;
-  char* addr = "127.0.0.1";
+    int c;
+    char* tempbuff = NULL;
+    char* raport_path = NULL;
+    float pace_val = 0;
+    int port = 0;
+    char* addr = "127.0.0.1";
 
-  while((c = getopt(argc, argv, "r:t:")) != -1)
-    {
-      switch(c)
-      {
-          case 'r':
-              raport_path = (char*)malloc(sizeof(optarg));
-              strcpy(raport_path, optarg);
-              break;
-          case 't':
-              tempbuff = (char*)malloc(sizeof(optarg));
-              strcpy(tempbuff, optarg);
-              pace_val = convert_to_float18(tempbuff);
-              break;
-          case '?':
-              display_help();
-              break;
-          break;
-      }
-    }
-
-    if((raport_path == NULL) || (pace_val == 0) || (argv[optind] == NULL))
-    {
-      printf(" Mandatory parameters: -r <path>, -t <val>, [<addr>]:port\n");
-      display_help();
-      exit(EXIT_FAILURE);
-    }
-
-    //port_addr = convert_address(argv[optind]);
-    /*****************************************************************/
-    if(argv[optind][0] == '[')
-    {
-      char* first_par = strtok(argv[optind], "[");
-      first_par = strtok(first_par, ":]");
-      char* second_par = strtok(0, ":]");
-      printf("%s\n", second_par);
-      strcpy(second_par, addr);
-
-      int temp = 0;
-      temp = strtol(first_par, NULL, 0);
-
-      if(temp <= 0)
-      {
-        printf(" port error: wrong port number\n");
-        display_help();
-        exit(EXIT_FAILURE);
-      }
-
-      port = temp;
-      printf("%d\n", port);
-    }
-    else {
-      port = 12345;
-      strcpy(argv[optind], addr);
-    }
+    do_getopt(argc, argv, &port, &addr, &raport_path, &pace_val);
 
    /******************************************
    * INIT BUFFER

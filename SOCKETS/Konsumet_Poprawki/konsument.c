@@ -158,113 +158,110 @@ void gen_raport(struct dataraport* data_r, int cnt)
 
 /**********************************************************************************
  *********************************************************************************/
+ void do_getopt(int argc, char* argv[], int* port, char** addr, int* cnt, float* dly )
+ {
+   int c;
+   char* tempbuff;
+   char* first_p = NULL;
+   char* second_p = NULL;
+
+   while((c = getopt(argc, argv, "#:r:s:")) != -1)
+     {
+       switch(c)
+       {
+           case '#':
+               tempbuff = (char*)malloc(sizeof(optarg));
+               strcpy(tempbuff, optarg);
+               first_p = strtok(tempbuff, ":");
+               second_p = strtok(NULL, ":");
+
+               //convert to int
+               *cnt = convert_to_int(first_p, second_p);
+
+               break;
+           case 'r':
+               if(*dly > 0)
+               {
+                   printf(" -r error, cannot use both -r and -s\n");
+                   display_help();
+                   exit(EXIT_FAILURE);
+               }
+
+               tempbuff = (char*)malloc(sizeof(optarg));
+               strcpy(tempbuff, optarg);
+               first_p = strtok(tempbuff, ":");
+               second_p = strtok(NULL, ":");
+
+               //convert to float
+               *dly = convert_to_float(first_p, second_p);
+
+               break;
+           case 's':
+               if(*dly > 0)
+               {
+                   printf(" -r error, cannot use both -r and -s\n");
+                   display_help();
+                   exit(EXIT_FAILURE);
+               }
+
+               tempbuff = (char*)malloc(sizeof(optarg));
+               strcpy(tempbuff, optarg);
+               first_p = strtok(tempbuff, ":");
+               second_p = strtok(NULL, ":");
+
+               //convert to float
+               *dly = convert_to_float(first_p, second_p);
+
+               break;
+           case '?':
+               display_help();
+               break;
+       }
+     }
+
+     if((cnt == 0) || (dly == 0) || (argv[optind] == NULL))
+     {
+       printf(" Mandatory parameters: <cnt>, <dly>, [<addr>]:port\n");
+       display_help();
+       exit(EXIT_FAILURE);
+     }
+
+     /********************************************************/
+     if(argv[optind][0] == '[')
+     {
+       first_p = strtok(argv[optind], "[");
+       first_p = strtok(first_p, ":]");
+       second_p = strtok(0, ":]");
+       printf("%s\n", second_p);
+       strcpy(second_p, *addr);
+
+       *port = strtol(first_p, NULL, 0);
+
+       if(*port <= 0)
+       {
+         printf(" port error: wrong port number\n");
+         display_help();
+         exit(EXIT_FAILURE);
+       }
+     }
+     else
+     {
+       *port = 12345;
+       strcpy(argv[optind], *addr);
+     }
+ }
+
+ //*************************************************************************
+ //*************************************************************************
 
 int main(int argc, char* argv[])
 {
-  int c;
-  char* tempbuff = NULL;
-  int cnt = 0;
-  float dly = 0;
-  char* first_p = NULL;
-  char* second_p = NULL;
-  int port = 0;
-  char* addr = "127.0.0.1";
+    int cnt = 0;
+    float dly = 0;
+    int port = 0;
+    char* addr = "127.0.0.1";
 
-  while((c = getopt(argc, argv, "#:r:s:")) != -1)
-    {
-      switch(c)
-      {
-          case '#':
-              tempbuff = (char*)malloc(sizeof(optarg));
-              strcpy(tempbuff, optarg);
-              first_p = strtok(tempbuff, ":");
-              second_p = strtok(NULL, ":");
-
-              //convert to int
-              cnt = convert_to_int(first_p, second_p);
-
-              break;
-          case 'r':
-              if(dly > 0)
-              {
-                  printf(" -r error, cannot use both -r and -s\n");
-                  display_help();
-                  exit(EXIT_FAILURE);
-              }
-
-              tempbuff = (char*)malloc(sizeof(optarg));
-              strcpy(tempbuff, optarg);
-              first_p = strtok(tempbuff, ":");
-              second_p = strtok(NULL, ":");
-
-              //convert to float
-              dly = convert_to_float(first_p, second_p);
-
-              break;
-          case 's':
-              if(dly > 0)
-              {
-                  printf(" -r error, cannot use both -r and -s\n");
-                  display_help();
-                  exit(EXIT_FAILURE);
-              }
-
-              tempbuff = (char*)malloc(sizeof(optarg));
-              strcpy(tempbuff, optarg);
-              first_p = strtok(tempbuff, ":");
-              second_p = strtok(NULL, ":");
-
-              //convert to float
-              dly = convert_to_float(first_p, second_p);
-
-              break;
-          case '?':
-              display_help();
-              break;
-      }
-    }
-
-    if((cnt == 0) || (dly == 0) || (argv[optind] == NULL))
-    {
-      printf(" Mandatory parameters: <cnt>, <dly>, [<addr>]:port\n");
-      display_help();
-      exit(EXIT_FAILURE);
-    }
-
-    /*************************************************************/
-    /* CONVERT ADDRESS */
-    /*************************************************************/
-    //port_addr = convert_address(argv[optind]);
-    //char* first_par = strtok(argv[optind], "port");
-    if(argv[optind][0] == '[')
-    {
-      char* first_par = strtok(argv[optind], "[");
-      first_par = strtok(first_par, ":]");
-      char* second_par = strtok(0, ":]");
-      printf("%s\n", second_par);
-      strcpy(second_par, addr);
-
-      int temp = 0;
-      temp = strtol(first_par, NULL, 0);
-
-      if(temp <= 0)
-      {
-        printf(" port error: wrong port number\n");
-        display_help();
-        exit(EXIT_FAILURE);
-      }
-
-      port = temp;
-      printf("%d\n", port);
-    }
-    else {
-      port = 12345;
-      strcpy(argv[optind], addr);
-    }
-
-    /*************************************************************/
-    /*************************************************************/
-
+    do_getopt(argc, argv, &port, &addr, &cnt, &dly);
 
     /******** CREATE FDS ********/
     int consumer_fd = socket(AF_INET, SOCK_STREAM, 0);
