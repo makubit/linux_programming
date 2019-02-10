@@ -17,7 +17,7 @@
 #include <arpa/inet.h>
 #include <sys/syscall.h>
 
-#define NANOSEC 1000000
+#define NANOSEC 1000000000
 #define BUFF_SIZE 1024*1024*1.25
 #define GEN_BLOCK_SIZE 640
 #define SEN_BLOCK_SIZE 112*1024
@@ -89,7 +89,7 @@ struct dataraport {
      cbuf->sold++;
      char* temp = (char*)malloc(640 * sizeof(char));
 
-     for(int i = 0; i < (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE); i++) //192 blokow 640 == 112KB
+     for(int i = 0; i < (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE); i++) //192 blocks 640 == 112KB
        {
          snprintf(temp, GEN_BLOCK_SIZE, "%s", cbuf->buff[idx++].in_buffer);
          strcat(data, temp);
@@ -99,7 +99,7 @@ struct dataraport {
 
      if(START_PRODUCTION == 0)
       START_PRODUCTION = 1;
-      
+
      return data;
  }
 
@@ -282,7 +282,8 @@ int main(int argc, char* argv[])
   char* tempbuff = NULL;
   char* raport_path = NULL;
   float pace_val = 0;
-  int port_addr = 0;
+  int port = 0;
+  char* addr = "127.0.0.1";
 
   while((c = getopt(argc, argv, "r:t:")) != -1)
     {
@@ -311,7 +312,33 @@ int main(int argc, char* argv[])
       exit(EXIT_FAILURE);
     }
 
-    port_addr = convert_address(argv[optind]);
+    //port_addr = convert_address(argv[optind]);
+    /*****************************************************************/
+    if(argv[optind][0] == '[')
+    {
+      char* first_par = strtok(argv[optind], "[");
+      first_par = strtok(first_par, ":]");
+      char* second_par = strtok(0, ":]");
+      printf("%s\n", second_par);
+      strcpy(second_par, addr);
+
+      int temp = 0;
+      temp = strtol(first_par, NULL, 0);
+
+      if(temp <= 0)
+      {
+        printf(" port error: wrong port number\n");
+        display_help();
+        exit(EXIT_FAILURE);
+      }
+
+      port = temp;
+      printf("%d\n", port);
+    }
+    else {
+      port = 12345;
+      strcpy(argv[optind], addr);
+    }
 
    /******************************************
    * INIT BUFFER
@@ -345,6 +372,7 @@ int main(int argc, char* argv[])
     dts.it_interval.tv_nsec = (long)(pace_val * NANOSEC) % NANOSEC;
     dts.it_value.tv_sec = (long)(pace_val);
     dts.it_value.tv_nsec = (long)(pace_val * NANOSEC) % NANOSEC;
+    printf("%d, %d\n", dts.it_value.tv_sec, dts.it_value.tv_nsec);
 
     rts.it_interval.tv_sec = 5;
     rts.it_interval.tv_nsec = 0;
@@ -372,9 +400,9 @@ int main(int argc, char* argv[])
     socklen_t addr_lenA = sizeof(A);
 
     A.sin_family = AF_INET;
-    A.sin_port = htons(port_addr);
+    A.sin_port = htons(port);
 
-    if(inet_aton("127.0.0.1", &A.sin_addr) == -1)
+    if(inet_aton(addr, &A.sin_addr) == -1)
     {
         perror("Aton inet error: Invalid address or address not supported\n");
         exit(EXIT_FAILURE);
@@ -516,26 +544,14 @@ int main(int argc, char* argv[])
             write(raport_fd, rapo, strlen(rapo));
           }
 
+          //if queue not full
+
           //other fds
           if(returned_fds > 0)
           {
             for(int i = 0; i < consumer_counter; i++)
             {
-              if(pfds[i+3].revents == POLLIN)
-              {
-                //consumer sends 4 bytes
-                char recvmes[4];
-                read(pfds[i+3].fd, recvmes, sizeof(recvmes));
-
-                q_push(pfds[i+3].fd);
-
-                data_raport[i].data_blocks++; //requested
-
-                returned_fds--;
-                if(returned_fds == 0) //when we read all fds no need to continue
-                  break;
-              }
-              else if(pfds[i+3].revents == (POLLHUP | POLLERR | POLLIN))
+              if(pfds[i+3].revents == (POLLHUP | POLLERR | POLLIN) || pfds[i+3].revents == (POLLHUP | POLLERR))
               {
                 char rapo[512];
                 memset(rapo, 0, sizeof(rapo));
@@ -548,12 +564,45 @@ int main(int argc, char* argv[])
 
                 connected--;
               }
+              else if(pfds[i+3].revents == POLLIN)
+              {
+                //consumer sends 4 bytes
+                char recvmes[4];
+                if(!recv(pfds[i+3].fd, recvmes, sizeof(recvmes), 0))
+                {
+                  char rapo[512];
+                  memset(rapo, 0, sizeof(rapo));
+                  gen_raport_2(rapo, data_raport[i]);
+                  write(raport_fd, rapo, strlen(rapo));
+
+                  close(pfds[i+3].fd);
+                  pfds[i+3].fd = 0;
+                  pfds[i+3].events = 0;
+
+                  connected--;
+
+                }
+                else {
+                printf("%s\n", recvmes);
+
+                q_push(pfds[i+3].fd);
+
+                data_raport[i].data_blocks++; //requested
+
+                returned_fds--;
+                if(returned_fds == 0) //when we read all fds no need to continue
+                  break;
+
+                }
+              }
             }
           }
 
           // try to send as much data as we can
+          printf("qsize: %d\n", q_size);
         if((q_size > 0) & (connected > 0) & (cb->capacity > ((SEN_BLOCK_SIZE/GEN_BLOCK_SIZE) + 1)))
         {
+          printf("send\n");
           int can_send = q_size;
           if((q_size*SEN_BLOCK_SIZE) > (cb->capacity*GEN_BLOCK_SIZE))
             {
@@ -569,7 +618,7 @@ int main(int argc, char* argv[])
 
             cb_pop(cb, send_b);
 
-            printf("%s, %d\n", send_b, sizeof(send_b));
+            //printf("%s, %d\n", send_b, sizeof(send_b));
 
             send(cfd, send_b, sizeof(send_b), 0);
           }

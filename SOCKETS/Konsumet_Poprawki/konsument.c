@@ -15,11 +15,10 @@
 #include <arpa/inet.h>
 #include <time.h>
 
-#define NANOSEC 1000000
-#define TIMER_LOCATION 1 //-r: 1, -s: 0
+#define NANOSEC 1000000000
 #define SEN_BLOCK_SIZE 112*1024
 static int add_to_dataraport_flag = 0;
-static char send_s[4] = { 's', 'e', 'n', 'd' };
+static char send_s[4] = { 's', 'e', 'n', '\0'};
 
 struct dataraport {
     struct timespec delay_a;
@@ -168,7 +167,8 @@ int main(int argc, char* argv[])
   float dly = 0;
   char* first_p = NULL;
   char* second_p = NULL;
-  int port_addr = 0;
+  int port = 0;
+  char* addr = "127.0.0.1";
 
   while((c = getopt(argc, argv, "#:r:s:")) != -1)
     {
@@ -231,7 +231,40 @@ int main(int argc, char* argv[])
       exit(EXIT_FAILURE);
     }
 
-    port_addr = convert_address(argv[optind]);
+    /*************************************************************/
+    /* CONVERT ADDRESS */
+    /*************************************************************/
+    //port_addr = convert_address(argv[optind]);
+    //char* first_par = strtok(argv[optind], "port");
+    if(argv[optind][0] == '[')
+    {
+      char* first_par = strtok(argv[optind], "[");
+      first_par = strtok(first_par, ":]");
+      char* second_par = strtok(0, ":]");
+      printf("%s\n", second_par);
+      strcpy(second_par, addr);
+
+      int temp = 0;
+      temp = strtol(first_par, NULL, 0);
+
+      if(temp <= 0)
+      {
+        printf(" port error: wrong port number\n");
+        display_help();
+        exit(EXIT_FAILURE);
+      }
+
+      port = temp;
+      printf("%d\n", port);
+    }
+    else {
+      port = 12345;
+      strcpy(argv[optind], addr);
+    }
+
+    /*************************************************************/
+    /*************************************************************/
+
 
     /******** CREATE FDS ********/
     int consumer_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -261,9 +294,9 @@ int main(int argc, char* argv[])
     socklen_t addr_lenA = sizeof(A);
 
     A.sin_family = AF_INET;
-    A.sin_port = htons(port_addr);
+    A.sin_port = htons(port);
 
-    if(inet_aton("127.0.0.1", &A.sin_addr) == -1)
+    if(inet_aton(addr, &A.sin_addr) == -1)
     {
         perror("Inet aton error: Invalid address or address not supported\n");
         exit(EXIT_FAILURE);
@@ -296,6 +329,7 @@ int main(int argc, char* argv[])
 
     while(recived < cnt)
     {
+      printf("loop\n");
         returned_fds = poll(pfds, 2, 5000);
 
         if(returned_fds > 0)
@@ -307,7 +341,7 @@ int main(int argc, char* argv[])
                 read(timer_fd, &timer_ticks, sizeof(timer_ticks));
 
                 for(int i = 0; i < timer_ticks; i++)
-                    send(consumer_fd, send_s, sizeof(send_s), 0);
+                    send(consumer_fd, send_s, strlen(send_s), 0);
 
                 clock_gettime(CLOCK_REALTIME, &clock_times[0]);
                 ticks_counter++;
@@ -360,6 +394,10 @@ int main(int argc, char* argv[])
                     add_to_dataraport(data_r, md5_final, ticks_counter-1, clock_times);
                     add_to_dataraport_flag=0;
                   }
+            }
+            else
+            {
+              sleep(1);
             }
         }
     }
