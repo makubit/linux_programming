@@ -18,7 +18,7 @@
 #define NANOSEC 1000000000
 #define SEN_BLOCK_SIZE 112*1024
 static int add_to_dataraport_flag = 0;
-static char send_s[4] = { 's', 'e', 'n', '\0'};
+static char send_s[4] = { 's', 'e', 'n', 'd'};
 
 struct dataraport {
     struct timespec delay_a;
@@ -83,44 +83,15 @@ float convert_to_float(char* first_p, char* second_p)
   return dly;
 }
 
-int convert_address(char* addr)
-{
-  char* first_p = strtok(addr, "port");
-  first_p = strtok(first_p, "[");
-  first_p = strtok(first_p, ":]");
-
-  int temp = 0;
-  if(first_p == NULL)
-  {
-    char* loc = "localhost";
-    for(int i=0; i< strlen(loc); i++)
-        temp += loc[i];
-
-    return temp;
-  }
-  temp = strtol(first_p, NULL, 0);
-
-  if(temp <= 0)
-  {
-    printf(" port error: wrong port number\n");
-    display_help();
-    exit(EXIT_FAILURE);
-  }
-
-  return temp;
-}
-
 void add_to_dataraport(struct dataraport* data_r, unsigned char* md5_final, int ticks_counter, struct timespec* times)
 {
-    data_r[ticks_counter].md5_final = (char*)malloc(sizeof(md5_final)); //!
+    data_r[ticks_counter].md5_final = (char*)malloc(sizeof(md5_final));
     char* md5_conv_temp = (char*)malloc(sizeof(md5_final));
-    //strcpy(data_r[ticks_counter].md5_final, (char*)md5_final);
+
     for(int i =0; i<16; i++)
       sprintf(&md5_conv_temp[i], "%x", (unsigned int)(md5_final[i]));
 
-    printf("%s\n", md5_conv_temp);
     sprintf(data_r[ticks_counter].md5_final, "%s", md5_conv_temp);
-      //sprintf(data_r[ticks_counter].md5_final, "%x", (unsigned int)(md5_conv_temp));
 
     data_r[ticks_counter].delay_a.tv_sec = times[1].tv_sec - times[0].tv_sec;
     data_r[ticks_counter].delay_a.tv_nsec = times[1].tv_nsec - times[0].tv_nsec;
@@ -129,7 +100,7 @@ void add_to_dataraport(struct dataraport* data_r, unsigned char* md5_final, int 
     data_r[ticks_counter].delay_b.tv_nsec = times[3].tv_nsec - times[2].tv_nsec;
 }
 
-void gen_raport(struct dataraport* data_r, int cnt)
+void gen_raport(struct dataraport* data_r, int cnt, char* addr)
 {
     struct timespec t_mono;
     struct timespec t_real;
@@ -141,7 +112,7 @@ void gen_raport(struct dataraport* data_r, int cnt)
     fprintf(stderr, " -> Monotonic: %ldsec, %ldnsec\n", t_mono.tv_sec, t_mono.tv_nsec);
     fprintf(stderr, " -> RealTime: %ldsec, %ldnsec\n", t_real.tv_sec, t_real.tv_nsec);
 
-    fprintf(stderr, " -> PID: %d, IPAddress: 127.0.0.1\n\n", getpid());
+    fprintf(stderr, " -> PID: %d, IPAddress: %s\n\n", getpid(), addr);
 
     //time differences
     //  a) between sending message and reading first bytes of reply
@@ -154,6 +125,15 @@ void gen_raport(struct dataraport* data_r, int cnt)
         fprintf(stderr, " -> Diff between start & end of reading: %ldsec, %ldnsec\n", data_r[i].delay_b.tv_sec, data_r[i].delay_b.tv_nsec);
         fprintf(stderr, " -> MD5SUM: %s\n\n", data_r[i].md5_final);
     }
+}
+
+void sleep_while_waiting()
+{
+  struct timespec time;
+  time.tv_sec = 1;
+  time.tv_nsec = 500000000;
+
+  nanosleep(&time, NULL);
 }
 
 /**********************************************************************************
@@ -251,6 +231,52 @@ void gen_raport(struct dataraport* data_r, int cnt)
      }
  }
 
+ void set_timerfd(int timer_fd, int dly, struct itimerspec* ts)
+ {
+   ts->it_interval.tv_sec = (long)(dly);
+   ts->it_interval.tv_nsec = (long)(dly * NANOSEC) % NANOSEC;
+   ts->it_value.tv_sec = (long)(dly);
+   ts->it_value.tv_nsec = (long)(dly * NANOSEC) % NANOSEC;
+
+   if(timerfd_settime(timer_fd, 0, ts, NULL) < 0)
+   {
+       perror("Set time in timer error\n");
+       close(timer_fd);
+       exit(EXIT_FAILURE);
+   }
+ }
+
+ void create_socket(struct sockaddr_in* A, int port, char* addr, int consumer_fd)
+ {
+   socklen_t addr_lenA = sizeof(*A);
+
+   A->sin_family = AF_INET;
+   A->sin_port = htons(port);
+
+   if(inet_aton(addr, &(A->sin_addr)) == -1)
+   {
+       perror("Inet aton error: Invalid address or address not supported\n");
+       exit(EXIT_FAILURE);
+   }
+
+   if(connect(consumer_fd, (const struct sockaddr*)A, addr_lenA) == -1)
+   {
+       perror("Connection failed\n");
+       exit(EXIT_FAILURE);
+   }
+ }
+
+ unsigned char* make_md5sum(char* read_data)
+ {
+   unsigned char* md5_final = (unsigned char*)malloc(16);
+   MD5_CTX contx;
+   MD5_Init(&contx);
+   MD5_Update(&contx, read_data, sizeof(read_data));
+   MD5_Final(md5_final, &contx);
+
+   return md5_final;
+ }
+
  //*************************************************************************
  //*************************************************************************
 
@@ -274,36 +300,11 @@ int main(int argc, char* argv[])
 
     /******** CREATE TIMER ********/
     struct itimerspec ts;
-    ts.it_interval.tv_sec = (long)(dly);
-    ts.it_interval.tv_nsec = (long)(dly * NANOSEC) % NANOSEC;
-    ts.it_value.tv_sec = (long)(dly);
-    ts.it_value.tv_nsec = (long)(dly * NANOSEC) % NANOSEC;
-
-    if(timerfd_settime(timer_fd, 0, &ts, NULL) < 0)
-    {
-        perror("Set time in timer error\n");
-        close(timer_fd);
-        exit(EXIT_FAILURE);
-    }
+    set_timerfd(timer_fd, dly, &ts);
 
     /************* CREATE SOCKET **********/
     struct sockaddr_in A;
-    socklen_t addr_lenA = sizeof(A);
-
-    A.sin_family = AF_INET;
-    A.sin_port = htons(port);
-
-    if(inet_aton(addr, &A.sin_addr) == -1)
-    {
-        perror("Inet aton error: Invalid address or address not supported\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if(connect(consumer_fd, (const struct sockaddr*)&A, addr_lenA) == -1)
-    {
-        perror("Connection failed\n");
-        exit(EXIT_FAILURE);
-    }
+    create_socket(&A, port, addr, consumer_fd);
 
     /************** CREATE DATA RAPORT STRUCTURE ***************/
     struct dataraport data_r[cnt];
@@ -321,12 +322,13 @@ int main(int argc, char* argv[])
     pfds[1].events = POLLIN;
 
     int ticks_counter = 0;
+    int send_counter = 0;
     int recived = 0;
     int check_r = 0; //to check if we recived all data we wanted
 
+    //------------------ MAIN LOOP --------------------//
     while(recived < cnt)
     {
-      printf("loop\n");
         returned_fds = poll(pfds, 2, 5000);
 
         if(returned_fds > 0)
@@ -337,8 +339,7 @@ int main(int argc, char* argv[])
               {
                 read(timer_fd, &timer_ticks, sizeof(timer_ticks));
 
-                for(int i = 0; i < timer_ticks; i++)
-                    send(consumer_fd, send_s, strlen(send_s), 0);
+                send(consumer_fd, send_s, strlen(send_s), 0);
 
                 clock_gettime(CLOCK_REALTIME, &clock_times[0]);
                 ticks_counter++;
@@ -376,32 +377,24 @@ int main(int argc, char* argv[])
                 }
 
                 clock_gettime(CLOCK_REALTIME, &clock_times[3]);
-                printf("size: %d, %s\n", sizeof(read_data), read_data);
 
                   //create md5sum
                   if(add_to_dataraport_flag)
                   {
-                    unsigned char md5_final[16];
-                    MD5_CTX contx;
-                    MD5_Init(&contx);
-                    MD5_Update(&contx, read_data, sizeof(read_data));
-                    MD5_Final(md5_final, &contx);
+                    unsigned char* md5_final = make_md5sum(read_data);
 
                     /********* ADD TO DATA RAPORT STRUCTURE  *********/
-                    add_to_dataraport(data_r, md5_final, ticks_counter-1, clock_times);
+                    add_to_dataraport(data_r, md5_final, send_counter, clock_times);
+                    send_counter++;
                     add_to_dataraport_flag=0;
                   }
             }
             else
-            {
-              sleep(1);
-            }
+              sleep_while_waiting();
         }
     }
 
-    gen_raport(data_r, cnt);
-
-    //free all data
+    gen_raport(data_r, cnt, addr);
 
     close(timer_fd);
     shutdown(consumer_fd, 2);

@@ -184,32 +184,6 @@ float convert_to_float18(char* int_buff)
   return (temp*60/96);
 }
 
-int convert_address(char* addr)
-{
-  char* first_p = strtok(addr, "port");
-  first_p = strtok(first_p, "[");
-  first_p = strtok(first_p, ":]");
-
-  int temp = 0;
-  if(first_p == NULL)
-  {
-    char* loc = "localhost\0";
-    for(int i=0; i< strlen(loc); i++)
-        temp += loc[i];
-
-    return temp;
-  }
-  temp = strtol(first_p, NULL, 0);
-
-  if(temp <= 0)
-  {
-    printf(" port error: wrong port number\n");
-    display_help();
-    exit(EXIT_FAILURE);
-  }
-  return temp;
-}
-
 //-------------- RAPORTS ----------------
 void generate_raport(char* raport, c_buff* cb)
 {
@@ -311,7 +285,6 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
        char* first_par = strtok(argv[optind], "[");
        first_par = strtok(first_par, ":]");
        char* second_par = strtok(0, ":]");
-       printf("%s\n", second_par);
        strcpy(second_par, *addr);
 
        *port = strtol(first_par, NULL, 0);
@@ -329,13 +302,70 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
      }
  }
 
+ void set_timersfd(struct itimerspec* dts, struct itimerspec* rts, float pace_val, int dtimer_fd, int rtimer_fd)
+ {
+   dts->it_interval.tv_sec = (long)(pace_val);
+   dts->it_interval.tv_nsec = (long)(pace_val * NANOSEC) % NANOSEC;
+   dts->it_value.tv_sec = (long)(pace_val);
+   dts->it_value.tv_nsec = (long)(pace_val * NANOSEC) % NANOSEC;
+
+   rts->it_interval.tv_sec = 5;
+   rts->it_interval.tv_nsec = 0;
+   rts->it_value.tv_sec = 5;
+   rts->it_value.tv_nsec = 0;
+
+   if(timerfd_settime(dtimer_fd, 0, dts, NULL) < 0)
+   {
+       perror("Set time in dtimer error\n");
+       close(dtimer_fd);
+       close(rtimer_fd);
+       exit(EXIT_FAILURE);
+   }
+
+   if(timerfd_settime(rtimer_fd, 0, rts, NULL) < 0)
+   {
+       perror("Set time in rtimer error\n");
+       close(dtimer_fd);
+       close(rtimer_fd);
+       exit(EXIT_FAILURE);
+   }
+ }
+
+ void create_socket(struct sockaddr_in* A, int port, char* addr, int producer_fd)
+ {
+   socklen_t addr_lenA = sizeof(*A);
+
+   A->sin_family = AF_INET;
+   A->sin_port = htons(port);
+
+   if(inet_aton(addr, &(A->sin_addr)) == -1)
+   {
+       perror("Aton inet error: Invalid address or address not supported\n");
+       exit(EXIT_FAILURE);
+   }
+
+   if(bind(producer_fd, (const struct sockaddr*)A, addr_lenA) == -1)
+   {
+       perror("bind error\n");
+       exit(EXIT_FAILURE);
+   }
+ }
+
+ void set_pollfds(struct pollfd* pfds, int dtimer_fd, int rtimer_fd, int producer_fd)
+ {
+   pfds[0].fd = dtimer_fd;
+   pfds[0].events = POLLIN;
+   pfds[1].fd = rtimer_fd;
+   pfds[1].events = POLLIN;
+   pfds[2].fd = producer_fd;
+   pfds[2].events = POLLIN;
+ }
+
 //----------------------------------------------------------
 //----------------------------------------------------------
 
 int main(int argc, char* argv[])
 {
-    int c;
-    char* tempbuff = NULL;
     char* raport_path = NULL;
     float pace_val = 0;
     int port = 0;
@@ -343,9 +373,7 @@ int main(int argc, char* argv[])
 
     do_getopt(argc, argv, &port, &addr, &raport_path, &pace_val);
 
-   /******************************************
-   * INIT BUFFER
-   ******************************************/
+    /**************** INIT BUFFER *************************/
     c_buff* cb;
     cb = (c_buff*)malloc(sizeof(c_buff)); //1 general buffer
     cb_init(cb, BUFF_SIZE);
@@ -370,52 +398,11 @@ int main(int argc, char* argv[])
 
     /******** CREATE TIMERS ********/
     struct itimerspec dts, rts; //dts -> struct for dtimer_fd, rts -> struct for rtimer_fd
-
-    dts.it_interval.tv_sec = (long)(pace_val);
-    dts.it_interval.tv_nsec = (long)(pace_val * NANOSEC) % NANOSEC;
-    dts.it_value.tv_sec = (long)(pace_val);
-    dts.it_value.tv_nsec = (long)(pace_val * NANOSEC) % NANOSEC;
-    printf("%d, %d\n", dts.it_value.tv_sec, dts.it_value.tv_nsec);
-
-    rts.it_interval.tv_sec = 5;
-    rts.it_interval.tv_nsec = 0;
-    rts.it_value.tv_sec = 5;
-    rts.it_value.tv_nsec = 0;
-
-    if(timerfd_settime(dtimer_fd, 0, &dts, NULL) < 0)
-    {
-        perror("Set time in dtimer error\n");
-        close(dtimer_fd);
-        close(rtimer_fd);
-        exit(EXIT_FAILURE);
-    }
-
-    if(timerfd_settime(rtimer_fd, 0, &rts, NULL) < 0)
-    {
-        perror("Set time in rtimer error\n");
-        close(dtimer_fd);
-        close(rtimer_fd);
-        exit(EXIT_FAILURE);
-    }
+    set_timersfd(&dts, &rts, pace_val, dtimer_fd, rtimer_fd);
 
     /************* CREATE SOCKET **********/
     struct sockaddr_in A;
-    socklen_t addr_lenA = sizeof(A);
-
-    A.sin_family = AF_INET;
-    A.sin_port = htons(port);
-
-    if(inet_aton(addr, &A.sin_addr) == -1)
-    {
-        perror("Aton inet error: Invalid address or address not supported\n");
-        exit(EXIT_FAILURE);
-    }
-
-    if(bind(producer_fd, (const struct sockaddr*)&A, addr_lenA) == -1)
-    {
-        perror("bind error\n");
-        exit(EXIT_FAILURE);
-    }
+    create_socket(&A, port, addr, producer_fd);
 
     /************** POLL **************/
     uint64_t dtimer_ticks, rtimer_ticks;
@@ -426,13 +413,7 @@ int main(int argc, char* argv[])
 
     struct pollfd* pfds;
     pfds = (struct pollfd*)malloc(sizeof(struct pollfd) * 53); ////
-
-    pfds[0].fd = dtimer_fd;
-    pfds[0].events = POLLIN;
-    pfds[1].fd = rtimer_fd;
-    pfds[1].events = POLLIN;
-    pfds[2].fd = producer_fd;
-    pfds[2].events = POLLIN;
+    set_pollfds(pfds, dtimer_fd, rtimer_fd, producer_fd);
 
     int dticks_counter = 0;
     int rticks_counter = 0;
@@ -450,8 +431,6 @@ int main(int argc, char* argv[])
     {
       returned_fds = poll(pfds, 53, 5000);
 
-      //printf("%s\n", cb->buff[0].in_buffer);
-
       if(returned_fds > 0)
       {
           if(pfds[0].revents == POLLIN)
@@ -460,22 +439,19 @@ int main(int argc, char* argv[])
             {
               read(dtimer_fd, &dtimer_ticks, sizeof(dtimer_ticks));
 
-            //generate data to buffer
-            for(int k = 0; k < dtimer_ticks; k++)
-            {
-              if(*str_prod_point == '\0')
-                str_prod_point = str_loop;
+              //generate data to buffer
+              for(int k = 0; k < dtimer_ticks; k++)
+              {
+                if(*str_prod_point == '\0')
+                  str_prod_point = str_loop;
 
-              cb_push(cb, *str_prod_point++);
-            }
-
-            dticks_counter++;
-            returned_fds--;
+                cb_push(cb, *str_prod_point++);
+              }
+              dticks_counter++;
+              returned_fds--;
 
             if(cb->capacity == cb->max)
-              //START_PRODUCTION = 0;
-              pfds[0].events = 0;
-
+              START_PRODUCTION = 0;
             }
           }
 
@@ -499,7 +475,6 @@ int main(int argc, char* argv[])
 
           if(pfds[2].revents) //if some actions on this socket -> listen and connect
           {
-            printf("tutej\n");
             if(listen(producer_fd, 50) == -1)
             {
                     perror("Cannot listen error\n");
@@ -513,8 +488,6 @@ int main(int argc, char* argv[])
             {
               reallocs++;
               pfds = (struct pollfd*)realloc(pfds, (reallocs * consumer_max) * sizeof(struct pollfd));
-
-              //realloc data_raport
               data_raport = (struct dataraport*)realloc(data_raport, (reallocs * consumer_max) * sizeof(struct dataraport));
             }
 
@@ -547,27 +520,12 @@ int main(int argc, char* argv[])
             write(raport_fd, rapo, strlen(rapo));
           }
 
-          //if queue not full
-
           //other fds
           if(returned_fds > 0)
           {
             for(int i = 0; i < consumer_counter; i++)
             {
-              if(pfds[i+3].revents == (POLLHUP | POLLERR | POLLIN) || pfds[i+3].revents == (POLLHUP | POLLERR))
-              {
-                char rapo[512];
-                memset(rapo, 0, sizeof(rapo));
-                gen_raport_2(rapo, data_raport[i]);
-                write(raport_fd, rapo, strlen(rapo));
-
-                close(pfds[i+3].fd);
-                pfds[i+3].fd = 0;
-                pfds[i+3].events = 0;
-
-                connected--;
-              }
-              else if(pfds[i+3].revents == POLLIN)
+              if(pfds[i+3].revents == POLLIN)
               {
                 //consumer sends 4 bytes
                 char recvmes[4];
@@ -586,50 +544,38 @@ int main(int argc, char* argv[])
 
                 }
                 else {
-                printf("%s\n", recvmes);
+                  q_push(pfds[i+3].fd);
 
-                q_push(pfds[i+3].fd);
+                  data_raport[i].data_blocks++; //requested
 
-                data_raport[i].data_blocks++; //requested
-
-                returned_fds--;
-                if(returned_fds == 0) //when we read all fds no need to continue
-                  break;
-
+                  returned_fds--;
+                  if(returned_fds == 0) //when we read all fds no need to continue
+                    break;
                 }
               }
             }
           }
 
           // try to send as much data as we can
-          printf("qsize: %d\n", q_size);
-        if((q_size > 0) & (connected > 0) & (cb->capacity > ((SEN_BLOCK_SIZE/GEN_BLOCK_SIZE) + 1)))
-        {
-          printf("send\n");
-          int can_send = q_size;
-          if((q_size*SEN_BLOCK_SIZE) > (cb->capacity*GEN_BLOCK_SIZE))
-            {
-              can_send = cb->capacity/(SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
-            }
-
-          for(int j = 0; j < can_send; j++) // /192
+          if((q_size > 0) & (connected > 0) & (cb->capacity > ((SEN_BLOCK_SIZE/GEN_BLOCK_SIZE) + 1)))
           {
-            int cfd = q_pop();
+            int can_send = q_size;
+            if((q_size*SEN_BLOCK_SIZE) > (cb->capacity*GEN_BLOCK_SIZE))
+                can_send = cb->capacity/(SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
 
-            char send_b[SEN_BLOCK_SIZE]; //SEN_BLOCK_SIZE
-            memset(send_b, 0, SEN_BLOCK_SIZE);
+              for(int j = 0; j < can_send; j++) // /192
+              {
+                int cfd = q_pop();
 
-            cb_pop(cb, send_b);
+                char send_b[SEN_BLOCK_SIZE]; //SEN_BLOCK_SIZE
+                memset(send_b, 0, SEN_BLOCK_SIZE);
 
-            //printf("%s, %d\n", send_b, sizeof(send_b));
-
-            send(cfd, send_b, sizeof(send_b), 0);
-          }
-          //pfds[0].events = POLLIN;
+                cb_pop(cb, send_b);
+                send(cfd, send_b, sizeof(send_b), 0);
+              }
+            }
         }
-      }
     }
-
     close(dtimer_fd);
     close(rtimer_fd);
     close(producer_fd);
