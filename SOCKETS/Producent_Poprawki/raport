@@ -1,0 +1,18 @@
+New connection:
+ -> Monotonic: 8297sec, 536513801nsec
+ -> RealTime: 1549802071sec, 795783985nsec
+ -> IP Address: 127.0.0.1 
+
+Lost connection:
+ -> Monotonic: 8299sec, 544781202nsec
+ -> RealTime: 1549802073sec, 804051347nsec
+ -> IP Address: 127.0.0.1 
+ -> Ilosc przeslanych bloków: 2 
+
+Regular raport:
+ -> Monotonic: 8300sec, 660381370nsec
+ -> RealTime: 1549802074sec, 919651572nsec
+ -> Connected: 0
+ -> In stock: 1310720 :: Percentage-wise: 100.00% 
+ -> In last 5 secs generated: 1654400, sold: 344064
+

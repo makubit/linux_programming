@@ -18,6 +18,7 @@
 #define NANOSEC 1000000
 #define TIMER_LOCATION 1 //-r: 1, -s: 0
 #define SEN_BLOCK_SIZE 112*1024
+static int add_to_dataraport_flag = 0;
 static char send_s[4] = { 's', 'e', 'n', 'd' };
 
 struct dataraport {
@@ -113,7 +114,14 @@ int convert_address(char* addr)
 void add_to_dataraport(struct dataraport* data_r, unsigned char* md5_final, int ticks_counter, struct timespec* times)
 {
     data_r[ticks_counter].md5_final = (char*)malloc(sizeof(md5_final)); //!
-    strcpy(data_r[ticks_counter].md5_final, (char*)md5_final);
+    char* md5_conv_temp = (char*)malloc(sizeof(md5_final));
+    //strcpy(data_r[ticks_counter].md5_final, (char*)md5_final);
+    for(int i =0; i<16; i++)
+      sprintf(&md5_conv_temp[i], "%x", (unsigned int)(md5_final[i]));
+
+    printf("%s\n", md5_conv_temp);
+    sprintf(data_r[ticks_counter].md5_final, "%s", md5_conv_temp);
+      //sprintf(data_r[ticks_counter].md5_final, "%x", (unsigned int)(md5_conv_temp));
 
     data_r[ticks_counter].delay_a.tv_sec = times[1].tv_sec - times[0].tv_sec;
     data_r[ticks_counter].delay_a.tv_nsec = times[1].tv_nsec - times[0].tv_nsec;
@@ -145,7 +153,7 @@ void gen_raport(struct dataraport* data_r, int cnt)
         fprintf(stderr, " \t********** BLOCK NO %d **********\n", i+1);
         fprintf(stderr, " -> Diff between sending mes and reading: %ldsec, %ldnsec\n", data_r[i].delay_a.tv_sec, data_r[i].delay_a.tv_nsec);
         fprintf(stderr, " -> Diff between start & end of reading: %ldsec, %ldnsec\n", data_r[i].delay_b.tv_sec, data_r[i].delay_b.tv_nsec);
-        fprintf(stderr, " -> MD5SUM: %02x\n\n", data_r[i].md5_final);
+        fprintf(stderr, " -> MD5SUM: %s\n\n", data_r[i].md5_final);
     }
 }
 
@@ -321,29 +329,37 @@ int main(int argc, char* argv[])
                 if(r == SEN_BLOCK_SIZE)
                 {
                   recived++;
+                  add_to_dataraport_flag=1;
                 }
                 else if(r > 0)
                 {
                   check_r +=r;
+                  add_to_dataraport_flag=0;
 
                   if(check_r == SEN_BLOCK_SIZE)
                   {
                     recived++;
                     check_r = 0;
+                    add_to_dataraport_flag=1;
                   }
                 }
 
                 clock_gettime(CLOCK_REALTIME, &clock_times[3]);
+                printf("size: %d, %s\n", sizeof(read_data), read_data);
 
-                //create md5sum
-                unsigned char md5_final[16];
-                MD5_CTX contx;
-                MD5_Init(&contx);
-                MD5_Update(&contx, read_data, sizeof(read_data));
-                MD5_Final(md5_final, &contx);
+                  //create md5sum
+                  if(add_to_dataraport_flag)
+                  {
+                    unsigned char md5_final[16];
+                    MD5_CTX contx;
+                    MD5_Init(&contx);
+                    MD5_Update(&contx, read_data, sizeof(read_data));
+                    MD5_Final(md5_final, &contx);
 
-                /********* ADD TO DATA RAPORT STRUCTURE  *********/
-                add_to_dataraport(data_r, md5_final, ticks_counter-1, clock_times);
+                    /********* ADD TO DATA RAPORT STRUCTURE  *********/
+                    add_to_dataraport(data_r, md5_final, ticks_counter-1, clock_times);
+                    add_to_dataraport_flag=0;
+                  }
             }
         }
     }
