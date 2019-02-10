@@ -87,15 +87,19 @@ struct dataraport {
      int idx = (cbuf->tail) % cbuf->max;
      cbuf->capacity-=(SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
      cbuf->sold++;
+     char* temp = (char*)malloc(640 * sizeof(char));
 
      for(int i = 0; i < (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE); i++) //192 blokow 640 == 112KB
-       snprintf(data, sizeof(cbuf->buff[idx++].in_buffer), "%s", cbuf->buff[idx++].in_buffer);
+       {
+         snprintf(temp, GEN_BLOCK_SIZE, "%s", cbuf->buff[idx++].in_buffer);
+         strcat(data, temp);
+       }
 
      cbuf->tail += (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
 
      if(START_PRODUCTION == 0)
-     START_PRODUCTION = 1;
-
+      START_PRODUCTION = 1;
+      
      return data;
  }
 
@@ -415,6 +419,8 @@ int main(int argc, char* argv[])
     {
       returned_fds = poll(pfds, 53, 5000);
 
+      //printf("%s\n", cb->buff[0].in_buffer);
+
       if(returned_fds > 0)
       {
           if(pfds[0].revents == POLLIN)
@@ -436,7 +442,9 @@ int main(int argc, char* argv[])
             returned_fds--;
 
             if(cb->capacity == cb->max)
-              START_PRODUCTION = 0;
+              //START_PRODUCTION = 0;
+              pfds[0].events = 0;
+
             }
           }
 
@@ -460,6 +468,7 @@ int main(int argc, char* argv[])
 
           if(pfds[2].revents) //if some actions on this socket -> listen and connect
           {
+            printf("tutej\n");
             if(listen(producer_fd, 50) == -1)
             {
                     perror("Cannot listen error\n");
@@ -533,9 +542,9 @@ int main(int argc, char* argv[])
                 gen_raport_2(rapo, data_raport[i]);
                 write(raport_fd, rapo, strlen(rapo));
 
+                close(pfds[i+3].fd);
+                pfds[i+3].fd = 0;
                 pfds[i+3].events = 0;
-                pfds[i+3].revents = 0;
-                shutdown(pfds[i+3].fd, 2);
 
                 connected--;
               }
@@ -560,8 +569,11 @@ int main(int argc, char* argv[])
 
             cb_pop(cb, send_b);
 
+            printf("%s, %d\n", send_b, sizeof(send_b));
+
             send(cfd, send_b, sizeof(send_b), 0);
           }
+          //pfds[0].events = POLLIN;
         }
       }
     }
