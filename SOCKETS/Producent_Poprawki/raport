@@ -1,0 +1,214 @@
+New connection:
+ -> Monotonic: 91747sec, 806755260nsec
+ -> RealTime: 1549926761sec, 559095164nsec
+ -> IP Address: 127.0.0.1 
+
+Regular raport:
+ -> Monotonic: 91750sec, 869689484nsec
+ -> RealTime: 1549926764sec, 622029339nsec
+ -> Connected: 1
+ -> In stock: 5120 :: Percentage-wise: 0.39% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91755sec, 870203074nsec
+ -> RealTime: 1549926769sec, 622542949nsec
+ -> Connected: 1
+ -> In stock: 10240 :: Percentage-wise: 0.78% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91760sec, 872363729nsec
+ -> RealTime: 1549926774sec, 624703604nsec
+ -> Connected: 1
+ -> In stock: 15360 :: Percentage-wise: 1.17% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+egular raport:
+ -> Monotonic: 91478sec, 927274258nsec
+ -> RealTime: 1549926492sec, 679614138nsec
+ -> Connected: 1
+ -> In stock: 20480 :: Percentage-wise: 1.56% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91483sec, 927133201nsec
+ -> RealTime: 1549926497sec, 679473049nsec
+ -> Connected: 1
+ -> In stock: 25600 :: Percentage-wise: 1.95% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91488sec, 934129736nsec
+ -> RealTime: 1549926502sec, 686469590nsec
+ -> Connected: 1
+ -> In stock: 30720 :: Percentage-wise: 2.34% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91493sec, 932351398nsec
+ -> RealTime: 1549926507sec, 684691275nsec
+ -> Connected: 1
+ -> In stock: 35840 :: Percentage-wise: 2.73% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91498sec, 930637173nsec
+ -> RealTime: 1549926512sec, 682977069nsec
+ -> Connected: 1
+ -> In stock: 40960 :: Percentage-wise: 3.12% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91504sec, 15493433nsec
+ -> RealTime: 1549926517sec, 767833346nsec
+ -> Connected: 1
+ -> In stock: 46080 :: Percentage-wise: 3.52% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91508sec, 927236262nsec
+ -> RealTime: 1549926522sec, 679576121nsec
+ -> Connected: 1
+ -> In stock: 51200 :: Percentage-wise: 3.91% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91513sec, 927901826nsec
+ -> RealTime: 1549926527sec, 680241682nsec
+ -> Connected: 1
+ -> In stock: 56320 :: Percentage-wise: 4.30% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91518sec, 927137806nsec
+ -> RealTime: 1549926532sec, 679477654nsec
+ -> Connected: 1
+ -> In stock: 61440 :: Percentage-wise: 4.69% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91523sec, 927113594nsec
+ -> RealTime: 1549926537sec, 679453449nsec
+ -> Connected: 1
+ -> In stock: 66560 :: Percentage-wise: 5.08% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91528sec, 927057002nsec
+ -> RealTime: 1549926542sec, 679396879nsec
+ -> Connected: 1
+ -> In stock: 71680 :: Percentage-wise: 5.47% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91533sec, 927089866nsec
+ -> RealTime: 1549926547sec, 679429710nsec
+ -> Connected: 1
+ -> In stock: 76800 :: Percentage-wise: 5.86% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91538sec, 959090704nsec
+ -> RealTime: 1549926552sec, 711431548nsec
+ -> Connected: 1
+ -> In stock: 81920 :: Percentage-wise: 6.25% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91543sec, 936633212nsec
+ -> RealTime: 1549926557sec, 688973082nsec
+ -> Connected: 1
+ -> In stock: 87040 :: Percentage-wise: 6.64% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91548sec, 927427336nsec
+ -> RealTime: 1549926562sec, 679767215nsec
+ -> Connected: 1
+ -> In stock: 92160 :: Percentage-wise: 7.03% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91553sec, 927326373nsec
+ -> RealTime: 1549926567sec, 679666274nsec
+ -> Connected: 1
+ -> In stock: 97280 :: Percentage-wise: 7.42% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91558sec, 928092172nsec
+ -> RealTime: 1549926572sec, 680432052nsec
+ -> Connected: 1
+ -> In stock: 102400 :: Percentage-wise: 7.81% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91563sec, 927219931nsec
+ -> RealTime: 1549926577sec, 679559776nsec
+ -> Connected: 1
+ -> In stock: 107520 :: Percentage-wise: 8.20% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91568sec, 935193059nsec
+ -> RealTime: 1549926582sec, 687532939nsec
+ -> Connected: 1
+ -> In stock: 112640 :: Percentage-wise: 8.59% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Lost connection:
+ -> Monotonic: 91572sec, 632034246nsec
+ -> RealTime: 1549926586sec, 384374128nsec
+ -> IP Address: 127.0.0.1 
+ -> Ilosc przeslanych bloków: 1 
+
+Regular raport:
+ -> Monotonic: 91573sec, 928334326nsec
+ -> RealTime: 1549926587sec, 680674185nsec
+ -> Connected: 0
+ -> In stock: 3072 :: Percentage-wise: 0.23% 
+ -> In last 5 secs generated: 5120, sold: 114688
+
+Regular raport:
+ -> Monotonic: 91578sec, 927444306nsec
+ -> RealTime: 1549926592sec, 679784174nsec
+ -> Connected: 0
+ -> In stock: 8192 :: Percentage-wise: 0.62% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91583sec, 934090973nsec
+ -> RealTime: 1549926597sec, 686430852nsec
+ -> Connected: 0
+ -> In stock: 13312 :: Percentage-wise: 1.02% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91588sec, 929364514nsec
+ -> RealTime: 1549926602sec, 681704392nsec
+ -> Connected: 0
+ -> In stock: 18432 :: Percentage-wise: 1.41% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91593sec, 927389373nsec
+ -> RealTime: 1549926607sec, 679729224nsec
+ -> Connected: 0
+ -> In stock: 23552 :: Percentage-wise: 1.80% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91598sec, 927877373nsec
+ -> RealTime: 1549926612sec, 680217252nsec
+ -> Connected: 0
+ -> In stock: 28672 :: Percentage-wise: 2.19% 
+ -> In last 5 secs generated: 5120, sold: 0
+
+Regular raport:
+ -> Monotonic: 91603sec, 928528005nsec
+ -> RealTime: 1549926617sec, 680867893nsec
+ -> Connected: 0
+ -> In stock: 33792 :: Percentage-wise: 2.58% 
+ -> In last 5 secs generated: 5120, sold: 0
+
