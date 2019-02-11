@@ -15,8 +15,8 @@
 #include <arpa/inet.h>
 #include <time.h>
 
-#define NANOSEC 1000000000
-#define SEN_BLOCK_SIZE 112*1024
+static long int SEN_BLOCK_SIZE = 112*1024;
+static long int NANOSEC = 1000000000;
 static int add_to_dataraport_flag = 0;
 static char send_s[4] = { 's', 'e', 'n', 'd'};
 
@@ -244,7 +244,7 @@ void sleep_while_waiting()
        close(timer_fd);
        exit(EXIT_FAILURE);
    }
- }
+  }
 
  void create_socket(struct sockaddr_in* A, int port, char* addr, int consumer_fd)
  {
@@ -297,6 +297,8 @@ int main(int argc, char* argv[])
         perror("Creating consumer or timer error\n");
         exit(EXIT_FAILURE);
     }
+
+    printf("%lf\n", dly);
 
     /******** CREATE TIMER ********/
     struct itimerspec ts;
@@ -355,39 +357,27 @@ int main(int argc, char* argv[])
                 clock_gettime(CLOCK_REALTIME, &clock_times[1]);
                 clock_gettime(CLOCK_REALTIME, &clock_times[2]);
 
-                int r = read(consumer_fd, read_data, SEN_BLOCK_SIZE);
+                int r = 0;
+                char temp[SEN_BLOCK_SIZE];
+                memset(temp, 0, SEN_BLOCK_SIZE);
 
+                while(r != SEN_BLOCK_SIZE)
+                {
                 //check if we received all bytes we wanted, than md5 and clock_gettime
-                if(r == SEN_BLOCK_SIZE)
-                {
-                  received++;
-                  add_to_dataraport_flag=1;
+                 r += read(consumer_fd, &read_data[r], SEN_BLOCK_SIZE);
                 }
-                else if(r > 0)
-                {
-                  check_r +=r;
-                  add_to_dataraport_flag=0;
+                received++;
 
-                  if(check_r == SEN_BLOCK_SIZE)
-                  {
-                    received++;
-                    check_r = 0;
-                    add_to_dataraport_flag=1;
-                  }
-                }
+                printf("%s\n", read_data);
 
                 clock_gettime(CLOCK_REALTIME, &clock_times[3]);
 
-                  //create md5sum
-                  if(add_to_dataraport_flag)
-                  {
-                    unsigned char* md5_final = make_md5sum(read_data);
+                //create md5sum
+                unsigned char* md5_final = make_md5sum(read_data);
 
-                    /********* ADD TO DATA RAPORT STRUCTURE  *********/
-                    add_to_dataraport(data_r, md5_final, send_counter, clock_times);
-                    send_counter++;
-                    add_to_dataraport_flag=0;
-                  }
+                /********* ADD TO DATA RAPORT STRUCTURE  *********/
+                add_to_dataraport(data_r, md5_final, send_counter, clock_times);
+                send_counter++;
             }
             else
               sleep_while_waiting();

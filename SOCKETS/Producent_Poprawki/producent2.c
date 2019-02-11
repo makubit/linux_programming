@@ -17,11 +17,16 @@
 #include <arpa/inet.h>
 #include <sys/syscall.h>
 
-#define NANOSEC 1000000000
+static long int NANOSEC = 1000000000;
 #define BUFF_SIZE 1024*1024*1.25
 #define GEN_BLOCK_SIZE 640
 #define SEN_BLOCK_SIZE 112*1024
-// :640 = 175
+
+/*static int NANOSEC = 10000000;
+static int BUFF_SIZE = 1024*1024*1.25;
+static int GEN_BLOCK_SIZE = 640;
+static int SEN_BLOCK_SIZE = 112*1024;*/
+// :640 = 179
 
 char* str_loop = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ";
 static int PRODUCTION = 1;
@@ -44,7 +49,8 @@ struct dataraport {
 
  typedef struct tc_buff
  {
-     buffer* buff;
+     //buffer* buff;
+     char* buff;
      int max;
      int capacity;
      size_t head;
@@ -55,47 +61,69 @@ struct dataraport {
 
  void cb_init(c_buff* cbuf, int max)
  {
-     cbuf->buff = (buffer*)malloc(max); //1,25MB
+     //cbuf->buff = (buffer*)malloc(max); //1,25MB
+     cbuf->buff = (char*)malloc(max);
      cbuf->capacity = 0; //ile mamy na stanie
      cbuf->head = 0;
      cbuf->tail = 0;
-     cbuf->max = max/GEN_BLOCK_SIZE;
+     cbuf->max = max;
      cbuf->generated = 0; //co 5 sekund zmiana
      cbuf->sold = 0; //co 5 sekund zmiana
  }
 
  void cb_push(c_buff* cbuf, int data)
  {
-     int idx = (cbuf->head) % cbuf->max;
+     if((cbuf->capacity + GEN_BLOCK_SIZE) >= cbuf->max)
+     {
+       /*printf("weszlo\n");
+        char* temp = (char*)malloc(cbuf->max - cbuf->capacity);
+        memset(temp, data, (cbuf->max - cbuf->capacity));
+        memcpy(&cbuf->buff[cbuf->head], temp, sizeof(temp));
 
-     if(cbuf->capacity == cbuf->max)
-         cbuf->tail++;
+        int size = GEN_BLOCK_SIZE - (cbuf->max - cbuf->capacity); //what we have to add at the beggining pf the buffer
+
+        temp = (char*)malloc(size);
+        memset(temp, data, size);
+        memcpy(&cbuf->buff[0], temp, size);
+        cbuf->head = size;*/
+        //char* temp = (char*)malloc(GEN_BLOCK_SIZE);
+        //memset(temp, data, GEN_BLOCK_SIZE);
+        //memcpy(&cbuf->buff[cbuf->head], temp, GEN_BLOCK_SIZE);
+        cbuf->head = cbuf->tail;
+        cbuf->capacity = cbuf->max;
+        //printf("c1\n");
+        //cbuf->capacity+=GEN_BLOCK_SIZE;
+     }
      else //add only if capacity < max
      {
-       cbuf->capacity++;
-       cbuf->head++;
-       cbuf->generated++;
-
        //add 640 bytes
-       cbuf->buff[idx].in_buffer = (char*)malloc(GEN_BLOCK_SIZE);
-       memset(cbuf->buff[idx].in_buffer, data, GEN_BLOCK_SIZE);
+       char* temp = (char*)malloc(GEN_BLOCK_SIZE);
+       memset(temp, data, GEN_BLOCK_SIZE);
+       memcpy(&cbuf->buff[cbuf->head], temp, GEN_BLOCK_SIZE);
+
+       cbuf->capacity+=GEN_BLOCK_SIZE;
+       cbuf->head+=GEN_BLOCK_SIZE;
+       cbuf->generated++;
+       //printf("%d, %d\n\n", cbuf->capacity, cbuf->head);
      }
+
+     printf("%d, %d, %d\n\n", cbuf->capacity, cbuf->head, cbuf->tail);
+
  }
 
  char* cb_pop(c_buff* cbuf, char* data)
  {
-     int idx = (cbuf->tail) % cbuf->max;
-     cbuf->capacity-=(SEN_BLOCK_SIZE/GEN_BLOCK_SIZE); //
+     cbuf->capacity-=SEN_BLOCK_SIZE; //
      cbuf->sold++;
-     char* temp = (char*)malloc(GEN_BLOCK_SIZE * sizeof(char));
 
-     for(int i = 0; i < (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE); i++) //179 blocks 640 == 112KB
-       {
-         snprintf(temp, GEN_BLOCK_SIZE, "%s", cbuf->buff[idx++].in_buffer);
-         strcat(data, temp);
-       }
+     if((cbuf->tail + SEN_BLOCK_SIZE) >= cbuf->max)
+       cbuf->tail = 0;
 
-     cbuf->tail += (SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
+     memcpy(data, &cbuf->buff[cbuf->tail], SEN_BLOCK_SIZE-8);
+     //printf("%s, %d\n\n", data, sizeof(data));
+     //printf("%s\n\n", cbuf->buff);
+
+     cbuf->tail += SEN_BLOCK_SIZE;
 
      if(START_PRODUCTION == 0)
       START_PRODUCTION = 1;
@@ -202,7 +230,7 @@ void generate_raport(char* raport, c_buff* cb)
   strcat(raport, temp);
   sprintf(temp, " -> Connected: %d\n", connected);
   strcat(raport, temp);
-  sprintf(temp, " -> In stock: %d :: Percentage-wise: %.2lf%% \n -> In last 5 secs generated: %d, sold: %d\n\n", cb->capacity*GEN_BLOCK_SIZE, (float)(cb->capacity)/(float)(cb->max)*100, cb->generated*GEN_BLOCK_SIZE, cb->sold*SEN_BLOCK_SIZE);
+  sprintf(temp, " -> In stock: %d :: Percentage-wise: %.2lf%% \n -> In last 5 secs generated: %d, sold: %d\n\n", cb->capacity, (float)(cb->capacity)/(float)(cb->max)*100, cb->generated*GEN_BLOCK_SIZE, cb->sold*SEN_BLOCK_SIZE);
   strcat(raport, temp);
 }
 
@@ -243,7 +271,7 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
   strcat(raport, temp);
   sprintf(temp, " -> IP Address: %s \n", data_raport.ip_addr);
   strcat(raport, temp);
-  sprintf(temp, " -> Ilosc przeslanych bloków: %d \n\n", data_raport.data_blocks-1);
+  sprintf(temp, " -> Ilosc przeslanych bloków: %d \n\n", data_raport.data_blocks);
   strcat(raport, temp);
 }
 
@@ -450,7 +478,7 @@ int main(int argc, char* argv[])
               dticks_counter++;
               returned_fds--;
 
-            if(cb->capacity == cb->max)
+            if(cb->capacity >= cb->max)
               START_PRODUCTION = 0;
             }
           }
@@ -541,7 +569,6 @@ int main(int argc, char* argv[])
                   pfds[i+3].events = 0;
 
                   connected--;
-
                 }
                 else {
                   q_push(pfds[i+3].fd);
@@ -557,11 +584,11 @@ int main(int argc, char* argv[])
           }
 
           // try to send as much data as we can
-          if((q_size > 0) & (connected > 0) & (cb->capacity > ((SEN_BLOCK_SIZE/GEN_BLOCK_SIZE) + 2)))
+          if((q_size > 0) & (connected > 0) & (cb->capacity > SEN_BLOCK_SIZE))
           {
             int can_send = q_size;
-            if((q_size*SEN_BLOCK_SIZE) > (cb->capacity*GEN_BLOCK_SIZE))
-                can_send = cb->capacity/(SEN_BLOCK_SIZE/GEN_BLOCK_SIZE);
+            if((q_size*SEN_BLOCK_SIZE) > (cb->capacity))
+                can_send = cb->capacity/SEN_BLOCK_SIZE;
 
               for(int j = 0; j < can_send; j++) // /192
               {
@@ -570,8 +597,12 @@ int main(int argc, char* argv[])
                 char send_b[SEN_BLOCK_SIZE]; //SEN_BLOCK_SIZE
                 memset(send_b, 0, SEN_BLOCK_SIZE);
 
+                printf("elo1\n");
+                printf("%d, %d, %d\n\n", cb->capacity, cb->head, cb->tail);
                 cb_pop(cb, send_b);
+                printf("elo2\n");
                 send(cfd, send_b, SEN_BLOCK_SIZE, 0);
+                //printf("elo3%s, %d\n", send_b, sizeof(send_b));
               }
             }
         }
