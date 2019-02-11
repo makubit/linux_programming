@@ -17,7 +17,6 @@
 
 static long int SEN_BLOCK_SIZE = 112*1024;
 static long int NANOSEC = 1000000000;
-static int add_to_dataraport_flag = 0;
 static char send_s[4] = { 's', 'e', 'n', 'd'};
 
 struct dataraport {
@@ -138,6 +137,29 @@ void sleep_while_waiting()
 
 /**********************************************************************************
  *********************************************************************************/
+
+ float process_parameter_dly(float dly, char* optarg)
+ {
+   char* tempbuff;
+   char* first_p = NULL;
+   char* second_p = NULL;
+
+   if(dly > 0)
+   {
+       printf(" -r error, cannot use both -r and -s\n");
+       display_help();
+       exit(EXIT_FAILURE);
+   }
+
+   tempbuff = (char*)malloc(sizeof(optarg));
+   strcpy(tempbuff, optarg);
+   first_p = strtok(tempbuff, ":");
+   second_p = strtok(NULL, ":");
+
+   //convert to float
+   return convert_to_float(first_p, second_p);
+ }
+
  void do_getopt(int argc, char* argv[], int* port, char** addr, int* cnt, float* dly )
  {
    int c;
@@ -157,41 +179,12 @@ void sleep_while_waiting()
 
                //convert to int
                *cnt = convert_to_int(first_p, second_p);
-
                break;
            case 'r':
-               if(*dly > 0)
-               {
-                   printf(" -r error, cannot use both -r and -s\n");
-                   display_help();
-                   exit(EXIT_FAILURE);
-               }
-
-               tempbuff = (char*)malloc(sizeof(optarg));
-               strcpy(tempbuff, optarg);
-               first_p = strtok(tempbuff, ":");
-               second_p = strtok(NULL, ":");
-
-               //convert to float
-               *dly = convert_to_float(first_p, second_p);
-
+               *dly = process_parameter_dly(*dly, optarg);
                break;
            case 's':
-               if(*dly > 0)
-               {
-                   printf(" -r error, cannot use both -r and -s\n");
-                   display_help();
-                   exit(EXIT_FAILURE);
-               }
-
-               tempbuff = (char*)malloc(sizeof(optarg));
-               strcpy(tempbuff, optarg);
-               first_p = strtok(tempbuff, ":");
-               second_p = strtok(NULL, ":");
-
-               //convert to float
-               *dly = convert_to_float(first_p, second_p);
-
+              *dly = process_parameter_dly(*dly, optarg);
                break;
            case '?':
                display_help();
@@ -277,6 +270,78 @@ void sleep_while_waiting()
    return md5_final;
  }
 
+ void do_poll_loop(int cnt, int timer_fd, int consumer_fd, struct timespec* clock_times, struct dataraport* data_r)
+ {
+   uint64_t timer_ticks;
+   char read_data[SEN_BLOCK_SIZE];
+   int returned_fds = 0;
+
+    /************** POLL **************/
+   struct pollfd pfds[2];
+   pfds[0].fd = timer_fd;
+   pfds[0].events = POLLIN;
+   pfds[1].fd = consumer_fd;
+   pfds[1].events = POLLIN;
+
+   int ticks_counter = 0;
+   int send_counter = 0;
+   int received = 0;
+
+   //------------------ MAIN LOOP --------------------//
+   while(received < cnt)
+   {
+       returned_fds = poll(pfds, 2, 5000);
+
+       if(returned_fds > 0)
+       {
+         if((ticks_counter) < cnt)
+         {
+             if(pfds[0].revents == POLLIN)
+             {
+               read(timer_fd, &timer_ticks, sizeof(timer_ticks));
+
+               send(consumer_fd, send_s, strlen(send_s), 0);
+
+               clock_gettime(CLOCK_REALTIME, &clock_times[0]);
+               ticks_counter++;
+             }
+           }
+         else
+           {
+             close(timer_fd);
+           }
+
+           if(pfds[1].revents == POLLIN)
+           {
+               clock_gettime(CLOCK_REALTIME, &clock_times[1]);
+               clock_gettime(CLOCK_REALTIME, &clock_times[2]);
+
+               int r = 0;
+               char temp[SEN_BLOCK_SIZE];
+               memset(temp, 0, SEN_BLOCK_SIZE);
+
+               while(r != SEN_BLOCK_SIZE)
+               {
+               //check if we received all bytes we wanted, than md5 and clock_gettime
+                r += read(consumer_fd, &read_data[r], SEN_BLOCK_SIZE);
+               }
+               received++;
+
+               clock_gettime(CLOCK_REALTIME, &clock_times[3]);
+
+               //create md5sum
+               unsigned char* md5_final = make_md5sum(read_data);
+
+               /********* ADD TO DATA RAPORT STRUCTURE  *********/
+               add_to_dataraport(data_r, md5_final, send_counter, clock_times);
+               send_counter++;
+           }
+           else
+             sleep_while_waiting();
+       }
+   }
+ }
+
  //*************************************************************************
  //*************************************************************************
 
@@ -298,8 +363,6 @@ int main(int argc, char* argv[])
         exit(EXIT_FAILURE);
     }
 
-    printf("%lf\n", dly);
-
     /******** CREATE TIMER ********/
     struct itimerspec ts;
     set_timerfd(timer_fd, dly, &ts);
@@ -312,78 +375,10 @@ int main(int argc, char* argv[])
     struct dataraport data_r[cnt];
     struct timespec clock_times[4];
 
-    /************** POLL **************/
-    uint64_t timer_ticks;
-    char read_data[SEN_BLOCK_SIZE];
-    int returned_fds = 0;
-
-    struct pollfd pfds[2];
-    pfds[0].fd = timer_fd;
-    pfds[0].events = POLLIN;
-    pfds[1].fd = consumer_fd;
-    pfds[1].events = POLLIN;
-
-    int ticks_counter = 0;
-    int send_counter = 0;
-    int received = 0;
-    int check_r = 0; //to check if we received all data we wanted
-
     //------------------ MAIN LOOP --------------------//
-    while(received < cnt)
-    {
-        returned_fds = poll(pfds, 2, 5000);
+    do_poll_loop(cnt, timer_fd, consumer_fd, clock_times, data_r);
 
-        if(returned_fds > 0)
-        {
-          if((ticks_counter) < cnt)
-          {
-              if(pfds[0].revents == POLLIN)
-              {
-                read(timer_fd, &timer_ticks, sizeof(timer_ticks));
-
-                send(consumer_fd, send_s, strlen(send_s), 0);
-
-                clock_gettime(CLOCK_REALTIME, &clock_times[0]);
-                ticks_counter++;
-              }
-            }
-          else
-            {
-              close(timer_fd);
-            }
-
-            if(pfds[1].revents == POLLIN)
-            {
-                clock_gettime(CLOCK_REALTIME, &clock_times[1]);
-                clock_gettime(CLOCK_REALTIME, &clock_times[2]);
-
-                int r = 0;
-                char temp[SEN_BLOCK_SIZE];
-                memset(temp, 0, SEN_BLOCK_SIZE);
-
-                while(r != SEN_BLOCK_SIZE)
-                {
-                //check if we received all bytes we wanted, than md5 and clock_gettime
-                 r += read(consumer_fd, &read_data[r], SEN_BLOCK_SIZE);
-                }
-                received++;
-
-                printf("%s\n", read_data);
-
-                clock_gettime(CLOCK_REALTIME, &clock_times[3]);
-
-                //create md5sum
-                unsigned char* md5_final = make_md5sum(read_data);
-
-                /********* ADD TO DATA RAPORT STRUCTURE  *********/
-                add_to_dataraport(data_r, md5_final, send_counter, clock_times);
-                send_counter++;
-            }
-            else
-              sleep_while_waiting();
-        }
-    }
-
+    //------------------ GENERATE RAPORT -------------//
     gen_raport(data_r, cnt, addr);
 
     close(timer_fd);

@@ -21,11 +21,6 @@ static long int NANOSEC = 1000000000;
 #define BUFF_SIZE 1024*1024*1.25
 #define GEN_BLOCK_SIZE 640
 #define SEN_BLOCK_SIZE 112*1024
-
-/*static int NANOSEC = 10000000;
-static int BUFF_SIZE = 1024*1024*1.25;
-static int GEN_BLOCK_SIZE = 640;
-static int SEN_BLOCK_SIZE = 112*1024;*/
 // :640 = 179
 
 char* str_loop = "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ";
@@ -75,24 +70,11 @@ struct dataraport {
  {
      if((cbuf->capacity + GEN_BLOCK_SIZE) >= cbuf->max)
      {
-       /*printf("weszlo\n");
-        char* temp = (char*)malloc(cbuf->max - cbuf->capacity);
-        memset(temp, data, (cbuf->max - cbuf->capacity));
-        memcpy(&cbuf->buff[cbuf->head], temp, sizeof(temp));
-
-        int size = GEN_BLOCK_SIZE - (cbuf->max - cbuf->capacity); //what we have to add at the beggining pf the buffer
-
-        temp = (char*)malloc(size);
-        memset(temp, data, size);
-        memcpy(&cbuf->buff[0], temp, size);
-        cbuf->head = size;*/
         //char* temp = (char*)malloc(GEN_BLOCK_SIZE);
         //memset(temp, data, GEN_BLOCK_SIZE);
         //memcpy(&cbuf->buff[cbuf->head], temp, GEN_BLOCK_SIZE);
         cbuf->head = cbuf->tail;
         cbuf->capacity = cbuf->max;
-        //printf("c1\n");
-        //cbuf->capacity+=GEN_BLOCK_SIZE;
      }
      else //add only if capacity < max
      {
@@ -104,11 +86,7 @@ struct dataraport {
        cbuf->capacity+=GEN_BLOCK_SIZE;
        cbuf->head+=GEN_BLOCK_SIZE;
        cbuf->generated++;
-       //printf("%d, %d\n\n", cbuf->capacity, cbuf->head);
      }
-
-     printf("%d, %d, %d\n\n", cbuf->capacity, cbuf->head, cbuf->tail);
-
  }
 
  char* cb_pop(c_buff* cbuf, char* data)
@@ -120,8 +98,6 @@ struct dataraport {
        cbuf->tail = 0;
 
      memcpy(data, &cbuf->buff[cbuf->tail], SEN_BLOCK_SIZE-8);
-     //printf("%s, %d\n\n", data, sizeof(data));
-     //printf("%s\n\n", cbuf->buff);
 
      cbuf->tail += SEN_BLOCK_SIZE;
 
@@ -170,7 +146,6 @@ int q_pop()
       int temp_fd = first->fd;
       tempItem = (*first).next;
 
-      //free(first);
       first = tempItem;
       if(first == NULL)
               queue = NULL;
@@ -597,12 +572,8 @@ int main(int argc, char* argv[])
                 char send_b[SEN_BLOCK_SIZE]; //SEN_BLOCK_SIZE
                 memset(send_b, 0, SEN_BLOCK_SIZE);
 
-                printf("elo1\n");
-                printf("%d, %d, %d\n\n", cb->capacity, cb->head, cb->tail);
                 cb_pop(cb, send_b);
-                printf("elo2\n");
                 send(cfd, send_b, SEN_BLOCK_SIZE, 0);
-                //printf("elo3%s, %d\n", send_b, sizeof(send_b));
               }
             }
         }
