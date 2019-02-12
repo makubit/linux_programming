@@ -328,6 +328,11 @@ void sleep_while_waiting()
                {
                //check if we received all bytes we wanted, than md5 and clock_gettime
                 r += read(consumer_fd, &read_data[r], SEN_BLOCK_SIZE);
+                if(!r)
+                {
+                  printf("Lost connection with producer, exiting...\n");
+                  exit(EXIT_FAILURE);
+                }
                }
                received++;
 
@@ -354,7 +359,7 @@ int main(int argc, char* argv[])
     int cnt = 0;
     float dly = 0;
     int port = 0;
-    char* addr = "localhost";
+    char* addr = "127.0.0.1";
 
     do_getopt(argc, argv, &port, &addr, &cnt, &dly);
 

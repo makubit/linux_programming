@@ -17,7 +17,7 @@
 #include <arpa/inet.h>
 #include <sys/syscall.h>
 
-static long int NANOSEC = 100000000;
+static long int NANOSEC = 1000000000;
 #define BUFF_SIZE 1024*1024*1.25
 #define GEN_BLOCK_SIZE 640
 #define SEN_BLOCK_SIZE 112*1024
@@ -63,35 +63,38 @@ struct dataraport {
 
  void cb_push(c_buff* cbuf, int data)
  {
-     if((cbuf->capacity + GEN_BLOCK_SIZE) >= cbuf->max)
+     if((cbuf->head + (GEN_BLOCK_SIZE)) >= cbuf->max)
      {
-        cbuf->head = cbuf->tail;
-        cbuf->capacity = cbuf->max;
+        char* temp = (char*)malloc((GEN_BLOCK_SIZE) * sizeof(char));
+        memset(temp, data, GEN_BLOCK_SIZE);
+        memcpy(&cbuf->buff[cbuf->head], temp, (GEN_BLOCK_SIZE));
+        cbuf->head = 0;
+        cbuf->capacity+=(GEN_BLOCK_SIZE);
      }
      else //add only if capacity < max
      {
        //add 640 bytes
-       char* temp = (char*)malloc(GEN_BLOCK_SIZE);
-       memset(temp, data, GEN_BLOCK_SIZE);
-       memcpy(&cbuf->buff[cbuf->head], temp, GEN_BLOCK_SIZE);
+       char* temp = (char*)malloc((GEN_BLOCK_SIZE)*sizeof(char));
+       memset(temp, data, (GEN_BLOCK_SIZE));
+       memcpy(&cbuf->buff[cbuf->head], temp, (GEN_BLOCK_SIZE));
 
-       cbuf->capacity+=GEN_BLOCK_SIZE;
-       cbuf->head+=GEN_BLOCK_SIZE;
+       cbuf->capacity+=(GEN_BLOCK_SIZE);
+       cbuf->head+=(GEN_BLOCK_SIZE);
        cbuf->generated++;
      }
  }
 
  char* cb_pop(c_buff* cbuf, char* data)
  {
-     cbuf->capacity-=SEN_BLOCK_SIZE; //
+     cbuf->capacity-=(SEN_BLOCK_SIZE); //
      cbuf->sold++;
 
-     if((cbuf->tail + SEN_BLOCK_SIZE) >= cbuf->max)
+     if((cbuf->tail + (SEN_BLOCK_SIZE)) >= cbuf->max)
        cbuf->tail = 0;
 
-     memcpy(data, &cbuf->buff[cbuf->tail], SEN_BLOCK_SIZE);
+     memcpy(data, &cbuf->buff[cbuf->tail], (SEN_BLOCK_SIZE));
 
-     cbuf->tail += SEN_BLOCK_SIZE;
+     cbuf->tail += (SEN_BLOCK_SIZE);
 
      if(START_PRODUCTION == 0)
       START_PRODUCTION = 1;
@@ -135,7 +138,6 @@ int q_pop()
    if(first != NULL)
    {
       q_size--;
-      printf("qsize: %d\n", q_size);
       int temp_fd = first->fd;
       tempItem = (*first).next;
 
@@ -147,7 +149,6 @@ int q_pop()
    }
    else
    {
-     q_size = 0;
      printf("Customers queue is empty, cannot pop...\n");
      return -1;
    }
@@ -199,7 +200,7 @@ void generate_raport(char* raport, c_buff* cb)
   strcat(raport, temp);
   sprintf(temp, " -> Connected: %d\n", connected);
   strcat(raport, temp);
-  sprintf(temp, " -> In stock: %d :: Percentage-wise: %.2lf%% \n -> In last 5 secs generated: %d, sold: %d\n\n", cb->capacity, (float)(cb->capacity)/(float)(cb->max)*100, cb->generated*GEN_BLOCK_SIZE, cb->sold*SEN_BLOCK_SIZE);
+  sprintf(temp, " -> In stock: %d :: Percentage-wise: %.2lf%% \n -> In last 5 secs generated: %d, sold: %d\n\n", cb->capacity, (float)(cb->capacity)/(float)(cb->max)*100, cb->generated*(GEN_BLOCK_SIZE), cb->sold*(SEN_BLOCK_SIZE));
   strcat(raport, temp);
 }
 
@@ -244,8 +245,6 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
   strcat(raport, temp);
 }
 
-//--------------------- GETOPT -------------------------//
-
  void do_getopt(int argc, char* argv[], int* port, char** addr, char** raport_path, float* pace_val)
  {
    int c;
@@ -284,9 +283,9 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
        char* first_par = strtok(argv[optind], "[");
        first_par = strtok(first_par, ":]");
        char* second_par = strtok(0, ":]");
-       strcpy(second_par, *addr);
+       strcpy(first_par, *addr);
 
-       *port = strtol(first_par, NULL, 0);
+       *port = strtol(second_par, NULL, 0);
 
        if(*port <= 0)
        {
@@ -296,8 +295,14 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
        }
      }
      else {
-       *port = 12345;
-       strcpy(argv[optind], *addr);
+       *port = strtol(argv[optind], NULL, 0);
+
+       if(*port <= 0)
+       {
+         printf(" port error: wrong port number\n");
+         display_help();
+         exit(EXIT_FAILURE);
+       }
      }
  }
 
@@ -350,9 +355,6 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
    }
  }
 
- //---------------------------------------------------------
- //---------------------------------------------------------
-
  void set_pollfds(struct pollfd* pfds, int dtimer_fd, int rtimer_fd, int producer_fd)
  {
    pfds[0].fd = dtimer_fd;
@@ -369,8 +371,7 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
 void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, struct dataraport* data_raport, int raport_fd)
 {
   /************** POLL **************/
-  uint64_t dtimer_ticks = 0;
-  uint64_t rtimer_ticks = 0;
+  uint64_t dtimer_ticks, rtimer_ticks;
   int returned_fds = 0;
   int consumer_counter = 0;
   int reallocs = 0;
@@ -378,7 +379,7 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
   char* str_prod_point = str_loop;
 
   struct pollfd* pfds;
-  pfds = (struct pollfd*)malloc(sizeof(struct pollfd) * 53);
+  pfds = (struct pollfd*)malloc(sizeof(struct pollfd) * 53); ////
   set_pollfds(pfds, dtimer_fd, rtimer_fd, producer_fd);
 
   int dticks_counter = 0;
@@ -396,14 +397,11 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
           {
             read(dtimer_fd, &dtimer_ticks, sizeof(dtimer_ticks));
 
-            //generate data to buffer
-            for(int k = 0; k < dtimer_ticks; k++)
-            {
-              if(*str_prod_point == '\0')
-                str_prod_point = str_loop;
+            if(*str_prod_point == '\0')
+              str_prod_point = str_loop;
 
-              cb_push(cb, *str_prod_point++);
-            }
+            cb_push(cb, *str_prod_point++);
+
             dticks_counter++;
             returned_fds--;
 
@@ -419,10 +417,13 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
           char rapo[1024];
           memset(rapo, 0, sizeof(rapo));
           generate_raport(rapo, cb);
+
           write(raport_fd, rapo, strlen(rapo));
 
           rticks_counter++;
           returned_fds--;
+
+          //set circle buffer vars = 0
           cb->generated = 0;
           cb->sold = 0;
         }
@@ -508,24 +509,23 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
             }
           }
         }
-        printf("%d\n", q_size);
+
         // try to send as much data as we can
-        if((q_size > 0) & (connected > 0) & (cb->capacity > SEN_BLOCK_SIZE))
+        if((q_size > 0) & (connected > 0) & (cb->capacity > (SEN_BLOCK_SIZE)))
         {
           int can_send = q_size;
-          if((q_size*SEN_BLOCK_SIZE) > (cb->capacity))
-              can_send = (cb->capacity/SEN_BLOCK_SIZE);
+          if((q_size*(SEN_BLOCK_SIZE)) > (cb->capacity))
+              can_send = cb->capacity/(SEN_BLOCK_SIZE);
 
             for(int j = 0; j < can_send; j++) // /192
             {
-              printf("cansend: %d, q_size: %d, connected: %d\n", can_send, connected, q_size);
               int cfd = q_pop();
 
-              char send_b[SEN_BLOCK_SIZE]; //SEN_BLOCK_SIZE
-              memset(send_b, 0, SEN_BLOCK_SIZE);
+              char send_b[SEN_BLOCK_SIZE];
+              memset(send_b, 0, (SEN_BLOCK_SIZE));
 
               cb_pop(cb, send_b);
-              send(cfd, send_b, SEN_BLOCK_SIZE, 0);
+              send(cfd, send_b, (SEN_BLOCK_SIZE), 0);
             }
           }
       }
