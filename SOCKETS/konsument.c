@@ -84,11 +84,11 @@ float convert_to_float(char* first_p, char* second_p)
 
 void add_to_dataraport(struct dataraport* data_r, unsigned char* md5_final, int ticks_counter, struct timespec* times)
 {
-    data_r[ticks_counter].md5_final = (char*)malloc(sizeof(md5_final));
+    data_r[ticks_counter].md5_final = (char*)malloc(MD5_DIGEST_LENGTH*2);
     char* md5_conv_temp = (char*)malloc(sizeof(md5_final));
 
-    for(int i =0; i<16; i++)
-      sprintf(&md5_conv_temp[i], "%x", (unsigned int)(md5_final[i]));
+    for(int i =0; i<MD5_DIGEST_LENGTH; i++)
+      sprintf(&md5_conv_temp[i*2], "%02x", (unsigned int)(md5_final[i]));
 
     sprintf(data_r[ticks_counter].md5_final, "%s", md5_conv_temp);
 
@@ -194,20 +194,20 @@ void sleep_while_waiting()
 
      if((*cnt == 0) || (*dly == 0) || (argv[optind] == NULL))
      {
-       printf(" Mandatory parameters: <cnt>, <dly>, [<addr>]:port\n");
+       printf(" Mandatory parameters: <cnt>, <dly>, <addr>:<port>\n");
        display_help();
        exit(EXIT_FAILURE);
      }
 
      /********************************************************/
-     if(argv[optind][0] == '[')
-     {
-       first_p = strtok(argv[optind], "[");
-       first_p = strtok(first_p, ":]");
-       second_p = strtok(0, ":]");
-       strcpy(first_p, *addr);
+     tempbuff = (char*)malloc(sizeof(argv[optind]));
+     strcpy(tempbuff, argv[optind]);
+     char* first_par = strtok(tempbuff, ":");
+     char* second_par = strtok(NULL, ":");
 
-       *port = strtol(second_p, NULL, 0);
+     if(!second_par)
+     {
+       *port = strtol(first_par, NULL, 0);
 
        if(*port <= 0)
        {
@@ -216,8 +216,12 @@ void sleep_while_waiting()
          exit(EXIT_FAILURE);
        }
      }
-     else {
-       *port = strtol(argv[optind], NULL, 0);
+     else
+     {
+       *addr = (char*)malloc(sizeof(first_par));
+       strcpy(*addr, first_par);
+
+       *port = strtol(second_par, NULL, 0);
 
        if(*port <= 0)
        {
@@ -268,7 +272,7 @@ void sleep_while_waiting()
    unsigned char* md5_final = (unsigned char*)malloc(16);
    MD5_CTX contx;
    MD5_Init(&contx);
-   MD5_Update(&contx, read_data, sizeof(read_data));
+   MD5_Update(&contx, read_data, 114688);
    MD5_Final(md5_final, &contx);
 
    return md5_final;
@@ -359,7 +363,7 @@ int main(int argc, char* argv[])
     int cnt = 0;
     float dly = 0;
     int port = 0;
-    char* addr = "127.0.0.1";
+    char* addr = "localhost";
 
     do_getopt(argc, argv, &port, &addr, &cnt, &dly);
 

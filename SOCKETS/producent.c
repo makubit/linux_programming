@@ -272,20 +272,20 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
 
      if((*raport_path == NULL) || (*pace_val == 0) || (argv[optind] == NULL))
      {
-       printf(" Mandatory parameters: -r <path>, -t <val>, [<addr>]:port\n");
+       printf(" Mandatory parameters: -r <path>, -t <val>, <addr>:<port>\n");
        display_help();
        exit(EXIT_FAILURE);
      }
 
      //---------------------------------------------
-     if(argv[optind][0] == '[')
-     {
-       char* first_par = strtok(argv[optind], "[");
-       first_par = strtok(first_par, ":]");
-       char* second_par = strtok(0, ":]");
-       strcpy(first_par, *addr);
+     tempbuff = (char*)malloc(sizeof(argv[optind]));
+     strcpy(tempbuff, argv[optind]);
+     char* first_par = strtok(tempbuff, ":");
+     char* second_par = strtok(NULL, ":");
 
-       *port = strtol(second_par, NULL, 0);
+     if(!second_par)
+     {
+       *port = strtol(first_par, NULL, 0);
 
        if(*port <= 0)
        {
@@ -294,8 +294,12 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
          exit(EXIT_FAILURE);
        }
      }
-     else {
-       *port = strtol(argv[optind], NULL, 0);
+     else
+     {
+       *addr = (char*)malloc(sizeof(first_par));
+       strcpy(*addr, first_par);
+
+       *port = strtol(second_par, NULL, 0);
 
        if(*port <= 0)
        {
@@ -540,7 +544,7 @@ int main(int argc, char* argv[])
     char* raport_path = NULL;
     float pace_val = 0;
     int port = 0;
-    char* addr = "127.0.0.1";
+    char* addr = "localhost";
 
     do_getopt(argc, argv, &port, &addr, &raport_path, &pace_val);
 
