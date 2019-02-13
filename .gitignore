@@ -3,6 +3,7 @@ getopt_exercises/
 LIBBUF/
 TEST_PARAMETERS/
 zajecia/
+SOCKETS_OLD/
 
 # Compiled source
 *.com
