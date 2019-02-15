@@ -14,6 +14,7 @@
 #include <openssl/md5.h>
 #include <arpa/inet.h>
 #include <time.h>
+#include <netdb.h>
 
 static long int SEN_BLOCK_SIZE = 112*1024;
 static long int NANOSEC = 1000000000;
@@ -253,8 +254,12 @@ void sleep_while_waiting()
 
    A->sin_family = AF_INET;
    A->sin_port = htons(port);
+   memset(A->sin_zero, 0, 8); //??
 
-   if(inet_aton(addr, &(A->sin_addr)) == -1)
+   struct hostent* h_tmp = 0;
+   h_tmp = gethostbyname(addr);
+
+   if(inet_aton(h_tmp->h_addr_list[0], &A->sin_addr) == -1)
    {
        perror("Inet aton error: Invalid address or address not supported\n");
        exit(EXIT_FAILURE);
@@ -363,7 +368,8 @@ int main(int argc, char* argv[])
     int cnt = 0;
     float dly = 0;
     int port = 0;
-    char* addr = "localhost";
+    char* addr = (char*)malloc(sizeof("localhost"));
+    strcpy(addr, "localhost");
 
     do_getopt(argc, argv, &port, &addr, &cnt, &dly);
 
@@ -381,6 +387,7 @@ int main(int argc, char* argv[])
     set_timerfd(timer_fd, dly, &ts);
 
     /************* CREATE SOCKET **********/
+    printf("%s\n", addr);
     struct sockaddr_in A;
     create_socket(&A, port, addr, consumer_fd);
 

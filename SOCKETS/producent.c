@@ -16,8 +16,10 @@
 #include <fcntl.h>
 #include <arpa/inet.h>
 #include <sys/syscall.h>
+#include <sys/ioctl.h>
+#include <netdb.h>
 
-static long int NANOSEC = 1000000000;
+static long int NANOSEC = 1000000000; //remember
 #define BUFF_SIZE 1024*1024*1.25
 #define GEN_BLOCK_SIZE 640
 #define SEN_BLOCK_SIZE 112*1024
@@ -345,8 +347,12 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
 
    A->sin_family = AF_INET;
    A->sin_port = htons(port);
+   memset(A->sin_zero, 0, 8); //??
 
-   if(inet_aton(addr, &(A->sin_addr)) == -1)
+   struct hostent* h_tmp = 0;
+   h_tmp = gethostbyname(addr);
+
+   if(inet_aton(h_tmp->h_addr_list[0], &(A->sin_addr)) == -1)
    {
        perror("Aton inet error: Invalid address or address not supported\n");
        exit(EXIT_FAILURE);
@@ -367,6 +373,9 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
    pfds[1].events = POLLIN;
    pfds[2].fd = producer_fd;
    pfds[2].events = POLLIN;
+
+   int n = 1;
+   ioctl(producer_fd, FIONBIO, (char*)&n);
  }
 
 //------------------------ MAIN LOOP -----------------------
@@ -391,7 +400,7 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
 
   while(PRODUCTION)
   {
-    returned_fds = poll(pfds, 53, 5000);
+    returned_fds = poll(pfds, 53, -1);
 
     if(returned_fds > 0)
     {
@@ -410,7 +419,10 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
             returned_fds--;
 
           if(cb->capacity >= cb->max)
-            START_PRODUCTION = 0;
+            {
+              START_PRODUCTION = 0;
+              pfds[0].events = 0;
+            }
           }
         }
 
@@ -440,7 +452,7 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
                   exit(EXIT_FAILURE);
           }
 
-          if((pfds[2].revents == POLLHUP) || (pfds[2].revents == (POLLHUP | POLLERR | POLLIN)))
+          if((pfds[2].revents & POLLHUP) || (pfds[2].revents & POLLERR))
             continue;
 
           if(consumer_counter == consumer_max) //realloc pfds structure
@@ -455,7 +467,7 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
           int addr_lenB = sizeof(B);
 
           //add fd to poll struct
-          pfds[consumer_counter+3].events = POLLIN;
+          pfds[consumer_counter+3].events = POLLIN | POLLPRI;
           pfds[consumer_counter+3].fd  = accept(producer_fd, (struct sockaddr*)&B, (socklen_t*)&addr_lenB);
           if(pfds[consumer_counter+3].fd  == -1)
           {
@@ -484,7 +496,7 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
         {
           for(int i = 0; i < consumer_counter; i++)
           {
-            if(pfds[i+3].revents == POLLIN)
+            if((pfds[i+3].revents & POLLIN) || (pfds[i+3].revents & POLLPRI))
             {
               //consumer sends 4 bytes
               char recvmes[4];
@@ -500,6 +512,7 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
                 pfds[i+3].events = 0;
 
                 connected--;
+                //disconnect_consumer(pfds, data_raport, i, raport_fd);
               }
               else {
                 q_push(pfds[i+3].fd);
@@ -510,6 +523,14 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
                 if(returned_fds == 0) //when we read all fds no need to continue
                   break;
               }
+            }
+            else if((pfds[i+3].revents & POLLERR) || (pfds[i+3].revents & POLLHUP) || (pfds[i+3].revents & POLLNVAL))
+            { //error - lost connection
+              close(pfds[i+3].fd);
+              pfds[i+3].fd = 0;
+              pfds[i+3].events = 0;
+
+              connected--;
             }
           }
         }
@@ -530,6 +551,8 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
 
               cb_pop(cb, send_b);
               send(cfd, send_b, (SEN_BLOCK_SIZE), 0);
+
+              pfds[0].events = POLLIN;
             }
           }
       }
@@ -544,7 +567,8 @@ int main(int argc, char* argv[])
     char* raport_path = NULL;
     float pace_val = 0;
     int port = 0;
-    char* addr = "localhost";
+    char* addr = (char*)malloc(sizeof("localhost"));
+    strcpy(addr, "localhost");
 
     do_getopt(argc, argv, &port, &addr, &raport_path, &pace_val);
 
@@ -563,6 +587,9 @@ int main(int argc, char* argv[])
 
     /********* CREATE FDS **********/
     int producer_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (setsockopt(producer_fd, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int)) < 0) //deal with bind problem
+      exit(EXIT_FAILURE); //TIME_WAIT STATE
+
     int dtimer_fd = timerfd_create(CLOCK_MONOTONIC, 0); //to produce data
     int rtimer_fd = timerfd_create(CLOCK_MONOTONIC, 0); //to generate raport
     if((producer_fd == -1) || (dtimer_fd == -1) || (rtimer_fd == -1))
