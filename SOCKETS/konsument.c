@@ -256,10 +256,7 @@ void sleep_while_waiting()
    A->sin_port = htons(port);
    memset(A->sin_zero, 0, 8); //??
 
-   struct hostent* h_tmp = 0;
-   h_tmp = gethostbyname(addr);
-
-   if(inet_aton(h_tmp->h_addr_list[0], &A->sin_addr) == -1)
+   if(inet_aton(addr, &A->sin_addr) == -1)
    {
        perror("Inet aton error: Invalid address or address not supported\n");
        exit(EXIT_FAILURE);
@@ -324,7 +321,7 @@ void sleep_while_waiting()
              close(timer_fd);
            }
 
-           if(pfds[1].revents == POLLIN)
+           if(pfds[1].revents & POLLIN)
            {
                clock_gettime(CLOCK_REALTIME, &clock_times[1]);
                clock_gettime(CLOCK_REALTIME, &clock_times[2]);
@@ -368,8 +365,8 @@ int main(int argc, char* argv[])
     int cnt = 0;
     float dly = 0;
     int port = 0;
-    char* addr = (char*)malloc(sizeof("localhost"));
-    strcpy(addr, "localhost");
+    char* addr = (char*)malloc(sizeof("127.0.0.1"));
+    strcpy(addr, "127.0.0.1");
 
     do_getopt(argc, argv, &port, &addr, &cnt, &dly);
 
@@ -387,7 +384,6 @@ int main(int argc, char* argv[])
     set_timerfd(timer_fd, dly, &ts);
 
     /************* CREATE SOCKET **********/
-    printf("%s\n", addr);
     struct sockaddr_in A;
     create_socket(&A, port, addr, consumer_fd);
 

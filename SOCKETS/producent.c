@@ -19,7 +19,7 @@
 #include <sys/ioctl.h>
 #include <netdb.h>
 
-static long int NANOSEC = 10000000; //remember
+static long int NANOSEC = 1000000000; //remember
 #define BUFF_SIZE 1024*1024*1.25
 #define GEN_BLOCK_SIZE 640
 #define SEN_BLOCK_SIZE 112*1024
@@ -34,7 +34,7 @@ static int returned_fds = 0;
 static int consumer_counter = 0;
 
 struct dataraport {
-  int consumer_id;
+  int consumer_fd;
   char* ip_addr;
   int data_blocks;
 };
@@ -245,7 +245,7 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
   strcat(raport, temp);
   sprintf(temp, " -> IP Address: %s \n", data_raport.ip_addr);
   strcat(raport, temp);
-  sprintf(temp, " -> Ilosc przeslanych bloków: %d \n\n", data_raport.data_blocks);
+  sprintf(temp, " -> Data blocks sent: %d \n\n", data_raport.data_blocks);
   strcat(raport, temp);
 }
 
@@ -343,7 +343,7 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
    }
  }
 
- void create_socket(struct sockaddr_in* A, int port, char* addr, int producer_fd)
+ void create_socket(struct sockaddr_in* A, int port, char* addr, int* producer_fd)
  {
    socklen_t addr_lenA = sizeof(*A);
 
@@ -351,22 +351,22 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
    A->sin_port = htons(port);
    memset(A->sin_zero, 0, 8); //??
 
-   struct hostent* h_tmp = 0;
-   h_tmp = gethostbyname(addr);
-
-   if(inet_aton(h_tmp->h_addr_list[0], &(A->sin_addr)) == -1)
+   if(inet_aton(addr, &(A->sin_addr)) == -1)
    {
        perror("Aton inet error: Invalid address or address not supported\n");
        exit(EXIT_FAILURE);
    }
 
-   if(bind(producer_fd, (const struct sockaddr*)A, addr_lenA) == -1)
+   if(bind(*producer_fd, (const struct sockaddr*)A, addr_lenA) == -1)
    {
        perror("bind error\n");
        exit(EXIT_FAILURE);
    }
 
-   if(listen(producer_fd, 50) == -1)
+   int n = 1;
+   ioctl(*producer_fd, FIONBIO, (char*)&n);
+
+   if(listen(*producer_fd, 500) == -1)
    {
            perror("Cannot listen error\n");
            exit(EXIT_FAILURE);
@@ -381,9 +381,6 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
    pfds[1].events = POLLIN;
    pfds[2].fd = producer_fd;
    pfds[2].events = POLLIN;
-
-   int n = 1;
-   ioctl(producer_fd, FIONBIO, (char*)&n);
  }
 
 void pfds_dtimer(int* dtimer_fd, char** str_prod_point, c_buff* cb, struct pollfd* pfds)
@@ -438,7 +435,7 @@ void pfds_new_connection(struct pollfd* pfds, int* producer_fd, struct datarapor
   }
 
   //add to dataraport structure
-  data_raport[consumer_counter].consumer_id = consumer_counter;
+  data_raport[consumer_counter].consumer_fd = pfds[consumer_counter+3].fd;
   data_raport[consumer_counter].ip_addr = inet_ntoa(B.sin_addr);
   data_raport[consumer_counter].data_blocks = 0;
 
@@ -467,7 +464,7 @@ void pfds_lost_connection(struct pollfd* pfds, struct dataraport* data_raport, i
   connected--;
 }
 
-void pfds_send_data(c_buff* cb)
+void pfds_send_data(c_buff* cb, struct dataraport* data_raport)
 {
   int can_send = q_size;
   if((q_size*(SEN_BLOCK_SIZE)) > (cb->capacity))
@@ -482,6 +479,15 @@ void pfds_send_data(c_buff* cb)
 
       cb_pop(cb, send_b);
       send(cfd, send_b, (SEN_BLOCK_SIZE), 0);
+
+      /*for(int i = 0; i < consumer_counter; i++)
+      {
+        if(data_raport[i].consumer_fd == cfd)
+          {
+            data_raport[i].data_blocks++;
+            break;
+          }
+      }*/
     }
 }
 
@@ -504,7 +510,7 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
     returned_fds = poll(pfds, consumer_max, -1);
     for(int i = 0; i < returned_fds; i++)
     {
-        if(pfds[0].revents & POLLIN)
+        if(pfds[0].revents & POLLIN) //TIMER 1
         {
           if(START_PRODUCTION)
           {
@@ -516,12 +522,12 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
           }
         }
 
-        if(pfds[1].revents & POLLIN)
+        if(pfds[1].revents & POLLIN) //TIMER 2
         {
           pfds_rtimer(&rtimer_fd, cb, &raport_fd);
         }
 
-        if(pfds[2].revents & POLLIN) //if some actions on this socket -> listen and connect
+        if(pfds[2].revents & POLLIN) //NEW CONNECTION
         {
           pfds_new_connection(pfds, &producer_fd, data_raport, &raport_fd);
 
@@ -534,7 +540,7 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
         }
 
         //other fds
-        if(returned_fds > 0)
+        if(returned_fds > 0) //AD CONSUMER TO QUEUE OR DISCONNECT
         {
           for(int j = 0; j < consumer_counter; j++)
           {
@@ -564,11 +570,11 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
         }
 
         // try to send as much data as we can
-        if((q_size > 0) & (connected > 0) & (cb->capacity > (SEN_BLOCK_SIZE)))
+        if((q_size > 0) & (connected > 0) & (cb->capacity > (SEN_BLOCK_SIZE))) //SEND DATA
         {
-          pfds_send_data(cb);
+          pfds_send_data(cb, data_raport);
           pfds[0].events = POLLIN;
-          }
+        }
       }
   }
 }
@@ -581,8 +587,8 @@ int main(int argc, char* argv[])
     char* raport_path = NULL;
     float pace_val = 0;
     int port = 0;
-    char* addr = (char*)malloc(sizeof("localhost"));
-    strcpy(addr, "localhost");
+    char* addr = (char*)malloc(sizeof("127.0.0.1"));
+    strcpy(addr, "127.0.0.1");
 
     do_getopt(argc, argv, &port, &addr, &raport_path, &pace_val);
 
@@ -618,7 +624,7 @@ int main(int argc, char* argv[])
 
     /************* CREATE SOCKET **********/
     struct sockaddr_in A;
-    create_socket(&A, port, addr, producer_fd);
+    create_socket(&A, port, addr, &producer_fd);
 
     /************** CREATE DATA RAPORT STRUCTURE ***************/
     struct dataraport* data_raport;
