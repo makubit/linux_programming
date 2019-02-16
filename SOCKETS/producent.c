@@ -19,7 +19,7 @@
 #include <sys/ioctl.h>
 #include <netdb.h>
 
-static long int NANOSEC = 1000000000; //remember
+static long int NANOSEC = 10000000; //remember
 #define BUFF_SIZE 1024*1024*1.25
 #define GEN_BLOCK_SIZE 640
 #define SEN_BLOCK_SIZE 112*1024
@@ -30,6 +30,8 @@ static int PRODUCTION = 1;
 static int START_PRODUCTION = 1;
 static int connected = 0;
 static int consumer_max = 50;
+static int returned_fds = 0;
+static int consumer_counter = 0;
 
 struct dataraport {
   int consumer_id;
@@ -188,7 +190,7 @@ float convert_to_float18(char* int_buff)
 void generate_raport(char* raport, c_buff* cb)
 {
   char temp[2048];
-  memset(raport, 0, 2048);
+  memset(temp, 0, 2048);
   struct timespec t_mono;
   struct timespec t_real;
 
@@ -209,7 +211,7 @@ void generate_raport(char* raport, c_buff* cb)
 void gen_raport_1(char* raport, struct sockaddr_in B) //new connection
 {
   char temp[2048];
-  memset(raport, 0, 2048);
+  memset(temp, 0, 2048);
   struct timespec t_mono;
   struct timespec t_real;
 
@@ -229,7 +231,7 @@ void gen_raport_1(char* raport, struct sockaddr_in B) //new connection
 void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
 {
   char temp[2048];
-  memset(raport, 0, 2048);
+  memset(temp, 0, 2048);
   struct timespec t_mono;
   struct timespec t_real;
 
@@ -363,6 +365,12 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
        perror("bind error\n");
        exit(EXIT_FAILURE);
    }
+
+   if(listen(producer_fd, 50) == -1)
+   {
+           perror("Cannot listen error\n");
+           exit(EXIT_FAILURE);
+   }
  }
 
  void set_pollfds(struct pollfd* pfds, int dtimer_fd, int rtimer_fd, int producer_fd)
@@ -378,15 +386,111 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
    ioctl(producer_fd, FIONBIO, (char*)&n);
  }
 
+void pfds_dtimer(int* dtimer_fd, char** str_prod_point, c_buff* cb, struct pollfd* pfds)
+{
+  uint64_t dtimer_ticks = 0;
+  read(*dtimer_fd, &dtimer_ticks, sizeof(dtimer_ticks));
+
+  if(**str_prod_point == '\0')
+    *str_prod_point = str_loop;
+
+  cb_push(cb, *(*str_prod_point)++); //dodac petle ??
+
+  if(cb->capacity >= cb->max)
+    {
+      START_PRODUCTION = 0;
+      pfds[0].events = 0;
+    }
+  returned_fds--;
+}
+
+void pfds_rtimer(int* rtimer_fd, c_buff* cb, int* raport_fd)
+{
+  uint64_t rtimer_ticks = 0;
+  read(*rtimer_fd, &rtimer_ticks, sizeof(rtimer_ticks));
+
+  char rapo[1024];
+  memset(rapo, 0, sizeof(rapo));
+
+  generate_raport(rapo, cb);
+
+  write(*raport_fd, rapo, strlen(rapo));
+
+  //set circle buffer vars = 0
+  cb->generated = 0;
+  cb->sold = 0;
+  returned_fds--;
+}
+
+void pfds_new_connection(struct pollfd* pfds, int* producer_fd, struct dataraport* data_raport, int* raport_fd)
+{
+  //struct for sockaddress
+  struct sockaddr_in B;
+  int addr_lenB = sizeof(B);
+
+  //add fd to poll struct
+  pfds[consumer_counter+3].events = POLLIN;
+  pfds[consumer_counter+3].fd  = accept(*producer_fd, (struct sockaddr*)&B, (socklen_t*)&addr_lenB);
+  if(pfds[consumer_counter+3].fd  == -1)
+  {
+      perror("Accept error\n");
+      exit(EXIT_FAILURE);
+  }
+
+  //add to dataraport structure
+  data_raport[consumer_counter].consumer_id = consumer_counter;
+  data_raport[consumer_counter].ip_addr = inet_ntoa(B.sin_addr);
+  data_raport[consumer_counter].data_blocks = 0;
+
+  connected++;
+  consumer_counter++;
+  returned_fds--;
+
+  //after new connection -> generate raport
+  char rapo[1024];
+  memset(rapo, 0, sizeof(rapo));
+  gen_raport_1(rapo, B);
+  write(*raport_fd, rapo, strlen(rapo));
+}
+
+void pfds_lost_connection(struct pollfd* pfds, struct dataraport* data_raport, int i, int* raport_fd)
+{
+  char rapo[512];
+  memset(rapo, 0, sizeof(rapo));
+  gen_raport_2(rapo, data_raport[i]);
+  write(*raport_fd, rapo, strlen(rapo));
+
+  close(pfds[i+3].fd);
+  pfds[i+3].fd = 0;
+  pfds[i+3].events = 0;
+
+  connected--;
+}
+
+void pfds_send_data(c_buff* cb)
+{
+  int can_send = q_size;
+  if((q_size*(SEN_BLOCK_SIZE)) > (cb->capacity))
+      can_send = cb->capacity/(SEN_BLOCK_SIZE);
+
+    for(int k = 0; k < can_send; k++) // /192
+    {
+      int cfd = q_pop();
+
+      char send_b[SEN_BLOCK_SIZE];
+      memset(send_b, 0, (SEN_BLOCK_SIZE));
+
+      cb_pop(cb, send_b);
+      send(cfd, send_b, (SEN_BLOCK_SIZE), 0);
+    }
+}
+
 //------------------------ MAIN LOOP -----------------------
 //----------------------------------------------------------
 
 void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, struct dataraport* data_raport, int raport_fd)
 {
   /************** POLL **************/
-  uint64_t dtimer_ticks, rtimer_ticks;
-  int returned_fds = 0;
-  int consumer_counter = 0;
   int reallocs = 0;
 
   char* str_prod_point = str_loop;
@@ -395,142 +499,66 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
   pfds = (struct pollfd*)malloc(sizeof(struct pollfd) * 53); ////
   set_pollfds(pfds, dtimer_fd, rtimer_fd, producer_fd);
 
-  int dticks_counter = 0;
-  int rticks_counter = 0;
-
   while(PRODUCTION)
   {
-    returned_fds = poll(pfds, 53, -1);
-
-    if(returned_fds > 0)
+    returned_fds = poll(pfds, consumer_max, -1);
+    for(int i = 0; i < returned_fds; i++)
     {
-        if(pfds[0].revents == POLLIN)
+        if(pfds[0].revents & POLLIN)
         {
           if(START_PRODUCTION)
           {
-            read(dtimer_fd, &dtimer_ticks, sizeof(dtimer_ticks));
-
-            if(*str_prod_point == '\0')
-              str_prod_point = str_loop;
-
-            cb_push(cb, *str_prod_point++);
-
-            dticks_counter++;
-            returned_fds--;
-
-          if(cb->capacity >= cb->max)
-            {
-              START_PRODUCTION = 0;
-              pfds[0].events = 0;
-            }
+            pfds_dtimer(&dtimer_fd, &str_prod_point, cb, pfds);
           }
-        }
-
-        if(pfds[1].revents == POLLIN)
-        {
-          read(rtimer_fd, &rtimer_ticks, sizeof(rtimer_ticks));
-
-          char rapo[1024];
-          memset(rapo, 0, sizeof(rapo));
-          generate_raport(rapo, cb);
-
-          write(raport_fd, rapo, strlen(rapo));
-
-          rticks_counter++;
-          returned_fds--;
-
-          //set circle buffer vars = 0
-          cb->generated = 0;
-          cb->sold = 0;
-        }
-
-        if(pfds[2].revents) //if some actions on this socket -> listen and connect
-        {
-          if(listen(producer_fd, 50) == -1)
+          else
           {
-                  perror("Cannot listen error\n");
-                  exit(EXIT_FAILURE);
+            pfds[0].events = 0;
           }
+        }
 
-          if((pfds[2].revents & POLLHUP) || (pfds[2].revents & POLLERR))
-            continue;
+        if(pfds[1].revents & POLLIN)
+        {
+          pfds_rtimer(&rtimer_fd, cb, &raport_fd);
+        }
 
-          if(consumer_counter == consumer_max) //realloc pfds structure
+        if(pfds[2].revents & POLLIN) //if some actions on this socket -> listen and connect
+        {
+          pfds_new_connection(pfds, &producer_fd, data_raport, &raport_fd);
+
+          if((consumer_counter-3) == consumer_max) //realloc pfds structure
           {
             reallocs++;
             pfds = (struct pollfd*)realloc(pfds, (reallocs * consumer_max) * sizeof(struct pollfd));
             data_raport = (struct dataraport*)realloc(data_raport, (reallocs * consumer_max) * sizeof(struct dataraport));
           }
-
-          //struct for sockaddress
-          struct sockaddr_in B;
-          int addr_lenB = sizeof(B);
-
-          //add fd to poll struct
-          pfds[consumer_counter+3].events = POLLIN | POLLPRI;
-          pfds[consumer_counter+3].fd  = accept(producer_fd, (struct sockaddr*)&B, (socklen_t*)&addr_lenB);
-          if(pfds[consumer_counter+3].fd  == -1)
-          {
-              perror("Accept error\n");
-              exit(EXIT_FAILURE);
-          }
-
-          //add to dataraport structure
-          data_raport[consumer_counter].consumer_id = consumer_counter;
-          data_raport[consumer_counter].ip_addr = inet_ntoa(B.sin_addr);
-          data_raport[consumer_counter].data_blocks = 0;
-
-          consumer_counter++;
-          returned_fds--;
-          connected++;
-
-          //after new connection -> generate raport
-          char rapo[1024];
-          memset(rapo, 0, sizeof(rapo));
-          gen_raport_1(rapo, B);
-          write(raport_fd, rapo, strlen(rapo));
         }
 
         //other fds
         if(returned_fds > 0)
         {
-          for(int i = 0; i < consumer_counter; i++)
+          for(int j = 0; j < consumer_counter; j++)
           {
-            if((pfds[i+3].revents & POLLIN) || (pfds[i+3].revents & POLLPRI))
+            if(pfds[j+3].revents & POLLIN)
             {
               //consumer sends 4 bytes
               char recvmes[4];
-              if(!recv(pfds[i+3].fd, recvmes, sizeof(recvmes), 0))
+              if(!recv(pfds[j+3].fd, recvmes, sizeof(recvmes), 0))
               {
-                char rapo[512];
-                memset(rapo, 0, sizeof(rapo));
-                gen_raport_2(rapo, data_raport[i]);
-                write(raport_fd, rapo, strlen(rapo));
-
-                close(pfds[i+3].fd);
-                pfds[i+3].fd = 0;
-                pfds[i+3].events = 0;
-
-                connected--;
-                //disconnect_consumer(pfds, data_raport, i, raport_fd);
+                pfds_lost_connection(pfds, data_raport, j, &raport_fd);
               }
               else {
-                q_push(pfds[i+3].fd);
+                q_push(pfds[j+3].fd);
 
-                data_raport[i].data_blocks++; //requested
+                data_raport[j].data_blocks++; //requested
 
                 returned_fds--;
                 if(returned_fds == 0) //when we read all fds no need to continue
                   break;
               }
             }
-            else if((pfds[i+3].revents & POLLERR) || (pfds[i+3].revents & POLLHUP) || (pfds[i+3].revents & POLLNVAL))
+            else if((pfds[j+3].revents & POLLERR) || (pfds[j+3].revents & POLLHUP) || (pfds[j+3].revents & POLLNVAL))
             { //error - lost connection
-              close(pfds[i+3].fd);
-              pfds[i+3].fd = 0;
-              pfds[i+3].events = 0;
-
-              connected--;
+              pfds_lost_connection(pfds, data_raport, j, &raport_fd);
             }
           }
         }
@@ -538,22 +566,8 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
         // try to send as much data as we can
         if((q_size > 0) & (connected > 0) & (cb->capacity > (SEN_BLOCK_SIZE)))
         {
-          int can_send = q_size;
-          if((q_size*(SEN_BLOCK_SIZE)) > (cb->capacity))
-              can_send = cb->capacity/(SEN_BLOCK_SIZE);
-
-            for(int j = 0; j < can_send; j++) // /192
-            {
-              int cfd = q_pop();
-
-              char send_b[SEN_BLOCK_SIZE];
-              memset(send_b, 0, (SEN_BLOCK_SIZE));
-
-              cb_pop(cb, send_b);
-              send(cfd, send_b, (SEN_BLOCK_SIZE), 0);
-
-              pfds[0].events = POLLIN;
-            }
+          pfds_send_data(cb);
+          pfds[0].events = POLLIN;
           }
       }
   }

@@ -1,0 +1,53 @@
+Regular raport:
+ -> Monotonic: 170135sec, 287671874nsec
+ -> RealTime: 1550276081sec, 131188805nsec
+ -> Connected: 0
+ -> In stock: 497920 :: Percentage-wise: 37.99% 
+ -> In last 5 secs generated: 497920, sold: 0
+
+Regular raport:
+ -> Monotonic: 170140sec, 287138637nsec
+ -> RealTime: 1550276086sec, 130655565nsec
+ -> Connected: 0
+ -> In stock: 979840 :: Percentage-wise: 74.76% 
+ -> In last 5 secs generated: 481920, sold: 0
+
+Regular raport:
+ -> Monotonic: 170145sec, 287973878nsec
+ -> RealTime: 1550276091sec, 131490800nsec
+ -> Connected: 0
+ -> In stock: 1310720 :: Percentage-wise: 100.00% 
+ -> In last 5 secs generated: 330240, sold: 0
+
+Regular raport:
+ -> Monotonic: 170150sec, 287466061nsec
+ -> RealTime: 1550276096sec, 130982968nsec
+ -> Connected: 0
+ -> In stock: 1310720 :: Percentage-wise: 100.00% 
+ -> In last 5 secs generated: 0, sold: 0
+
+New connection:
+ -> Monotonic: 170153sec, 176812908nsec
+ -> RealTime: 1550276099sec, 20329838nsec
+ -> IP Address: 127.0.0.1 
+
+Regular raport:
+ -> Monotonic: 170155sec, 287622744nsec
+ -> RealTime: 1550276101sec, 131139672nsec
+ -> Connected: 1
+ -> In stock: 1310592 :: Percentage-wise: 99.99% 
+ -> In last 5 secs generated: 114560, sold: 114688
+
+Lost connection:
+ -> Monotonic: 170159sec, 681862578nsec
+ -> RealTime: 1550276105sec, 525379511nsec
+ -> IP Address: 127.0.0.1 
+ -> Ilosc przeslanych bloków: 5 
+
+Regular raport:
+ -> Monotonic: 170160sec, 287502182nsec
+ -> RealTime: 1550276106sec, 131019107nsec
+ -> Connected: 0
+ -> In stock: 1295360 :: Percentage-wise: 98.83% 
+ -> In last 5 secs generated: 443520, sold: 458752
+
