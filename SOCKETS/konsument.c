@@ -85,8 +85,8 @@ float convert_to_float(char* first_p, char* second_p)
 
 void add_to_dataraport(struct dataraport* data_r, unsigned char* md5_final, int ticks_counter, struct timespec* times)
 {
-    data_r[ticks_counter].md5_final = (char*)malloc(MD5_DIGEST_LENGTH*2);
-    char* md5_conv_temp = (char*)malloc(sizeof(md5_final));
+    data_r[ticks_counter].md5_final = (char*)calloc(1, MD5_DIGEST_LENGTH*2);
+    char* md5_conv_temp = (char*)calloc(1, sizeof(md5_final));
 
     for(int i =0; i<MD5_DIGEST_LENGTH; i++)
       sprintf(&md5_conv_temp[i*2], "%02x", (unsigned int)(md5_final[i]));
@@ -141,7 +141,8 @@ void sleep_while_waiting()
 
  float process_parameter_dly(float dly, char* optarg)
  {
-   char* tempbuff;
+   char tempbuff[2048];
+   memset(tempbuff, 0, 2048);
    char* first_p = NULL;
    char* second_p = NULL;
 
@@ -152,7 +153,6 @@ void sleep_while_waiting()
        exit(EXIT_FAILURE);
    }
 
-   tempbuff = (char*)malloc(sizeof(optarg));
    strcpy(tempbuff, optarg);
    first_p = strtok(tempbuff, ":");
    second_p = strtok(NULL, ":");
@@ -164,7 +164,8 @@ void sleep_while_waiting()
  void do_getopt(int argc, char* argv[], int* port, char** addr, int* cnt, float* dly )
  {
    int c;
-   char* tempbuff;
+   char tempbuff[2048];
+   memset(tempbuff, 0, 2048);
    char* first_p = NULL;
    char* second_p = NULL;
 
@@ -173,7 +174,6 @@ void sleep_while_waiting()
        switch(c)
        {
            case '#':
-               tempbuff = (char*)malloc(sizeof(optarg));
                strcpy(tempbuff, optarg);
                first_p = strtok(tempbuff, ":");
                second_p = strtok(NULL, ":");
@@ -201,7 +201,7 @@ void sleep_while_waiting()
      }
 
      /********************************************************/
-     tempbuff = (char*)malloc(sizeof(argv[optind]));
+     memset(tempbuff, 0, 2048);
      strcpy(tempbuff, argv[optind]);
      char* first_par = strtok(tempbuff, ":");
      char* second_par = strtok(NULL, ":");
@@ -219,7 +219,7 @@ void sleep_while_waiting()
      }
      else
      {
-       *addr = (char*)malloc(sizeof(first_par));
+       *addr = (char*)calloc(1, sizeof(first_par));
        strcpy(*addr, first_par);
        if(strcmp(*addr, "localhost"))
         strcpy(*addr, "127.0.0.1");
@@ -273,10 +273,10 @@ void sleep_while_waiting()
 
  unsigned char* make_md5sum(char* read_data)
  {
-   unsigned char* md5_final = (unsigned char*)malloc(16);
+   unsigned char* md5_final = (unsigned char*)calloc(1, 16);
    MD5_CTX contx;
    MD5_Init(&contx);
-   MD5_Update(&contx, read_data, 114688);
+   MD5_Update(&contx, read_data, SEN_BLOCK_SIZE);
    MD5_Final(md5_final, &contx);
 
    return md5_final;
@@ -367,7 +367,7 @@ int main(int argc, char* argv[])
     int cnt = 0;
     float dly = 0;
     int port = 0;
-    char* addr = (char*)malloc(sizeof("127.0.0.1"));
+    char* addr = (char*)calloc(1, sizeof("127.0.0.1"));
     strcpy(addr, "127.0.0.1");
 
     do_getopt(argc, argv, &port, &addr, &cnt, &dly);

@@ -56,7 +56,7 @@ struct dataraport {
 
  void cb_init(c_buff* cbuf, int max)
  {
-     cbuf->buff = (char*)malloc(max);
+     cbuf->buff = (char*)calloc(1, max);
      cbuf->capacity = 0; //ile mamy na stanie
      cbuf->head = 0;
      cbuf->tail = 0;
@@ -67,28 +67,21 @@ struct dataraport {
 
  void cb_push(c_buff* cbuf, int data)
  {
+    char temp[GEN_BLOCK_SIZE];
+    memset(temp, data, GEN_BLOCK_SIZE);
+    memcpy(&cbuf->buff[cbuf->head], temp, (GEN_BLOCK_SIZE));
+
      if((cbuf->head + (GEN_BLOCK_SIZE)) >= cbuf->max)
      {
-        char* temp = (char*)malloc((GEN_BLOCK_SIZE) * sizeof(char));
-        memset(temp, data, GEN_BLOCK_SIZE);
-        memcpy(&cbuf->buff[cbuf->head], temp, (GEN_BLOCK_SIZE));
         cbuf->head = 0;
         cbuf->capacity+=(GEN_BLOCK_SIZE);
-
-        free(temp);
      }
      else //add only if capacity < max
      {
        //add 640 bytes
-       char* temp = (char*)malloc((GEN_BLOCK_SIZE)*sizeof(char));
-       memset(temp, data, (GEN_BLOCK_SIZE));
-       memcpy(&cbuf->buff[cbuf->head], temp, (GEN_BLOCK_SIZE));
-
        cbuf->capacity+=(GEN_BLOCK_SIZE);
        cbuf->head+=(GEN_BLOCK_SIZE);
        cbuf->generated++;
-
-       free(temp);
      }
  }
 
@@ -131,7 +124,7 @@ static int q_size = 0;
 void q_push(int fd)
 {
    q_size++;
-   tempItem = (struct customers_q*)malloc(sizeof(struct customers_q));
+   tempItem = (struct customers_q*)calloc(1, sizeof(struct customers_q));
    (*tempItem).fd = fd;
    (*tempItem).next = NULL;
    if(queue == NULL)
@@ -258,18 +251,18 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
  void do_getopt(int argc, char* argv[], int* port, char** addr, char** raport_path, float* pace_val)
  {
    int c;
-   char* tempbuff = NULL;
+   char tempbuff[2048];
+   memset(tempbuff, 0, 2048);
 
    while((c = getopt(argc, argv, "r:t:")) != -1)
      {
        switch(c)
        {
            case 'r':
-               *raport_path = (char*)malloc(sizeof(optarg));
+               *raport_path = (char*)calloc(1, sizeof(optarg));
                strcpy(*raport_path, optarg);
                break;
            case 't':
-               tempbuff = (char*)malloc(sizeof(optarg));
                strcpy(tempbuff, optarg);
                *pace_val = convert_to_float18(tempbuff);
                break;
@@ -288,7 +281,6 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
      }
 
      //---------------------------------------------
-     tempbuff = (char*)malloc(sizeof(argv[optind]));
      strcpy(tempbuff, argv[optind]);
      char* first_par = strtok(tempbuff, ":");
      char* second_par = strtok(NULL, ":");
@@ -306,7 +298,7 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
      }
      else
      {
-       *addr = (char*)malloc(sizeof(first_par));
+       *addr = (char*)calloc(1, sizeof(first_par));
        strcpy(*addr, first_par);
 
        *port = strtol(second_par, NULL, 0);
@@ -508,19 +500,15 @@ void pfds_send_data(c_buff* cb, struct dataraport* data_raport)
 void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, struct dataraport* data_raport, int raport_fd)
 {
   /************** POLL **************/
-  int reallocs = 0;
-
   char* str_prod_point = str_loop;
 
-  struct pollfd* pfds;
-  pfds = (struct pollfd*)malloc(sizeof(struct pollfd) * consumer_max); ////
+  struct pollfd pfds[consumer_max];
   set_pollfds(pfds, dtimer_fd, rtimer_fd, producer_fd);
 
   while(PRODUCTION)
   {
     returned_fds = poll(pfds, consumer_max, -1);
 
-    //for(int i = 0; i < returned_fds; i++)
     if(returned_fds > 0)
     {
         if(pfds[0].revents & POLLIN) //TIMER 1
@@ -543,13 +531,6 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
         if(pfds[2].revents & POLLIN) //NEW CONNECTION
         {
           pfds_new_connection(pfds, &producer_fd, data_raport, &raport_fd);
-
-          if((consumer_counter-3) == consumer_max) //realloc pfds structure
-          {
-            reallocs++;
-            pfds = (struct pollfd*)realloc(pfds, (reallocs * consumer_max) * sizeof(struct pollfd));
-            data_raport = (struct dataraport*)realloc(data_raport, (reallocs * consumer_max) * sizeof(struct dataraport));
-          }
         }
 
         //other fds
@@ -598,14 +579,13 @@ int main(int argc, char* argv[])
     char* raport_path = NULL;
     float pace_val = 0;
     int port = 0;
-    char* addr = (char*)malloc(sizeof("127.0.0.1"));
+    char* addr = (char*)calloc(1, sizeof("127.0.0.1"));
     strcpy(addr, "127.0.0.1");
 
     do_getopt(argc, argv, &port, &addr, &raport_path, &pace_val);
 
     /**************** INIT BUFFER *************************/
-    c_buff* cb;
-    cb = (c_buff*)malloc(sizeof(c_buff)); //1 general buffer
+    c_buff cb[1];
     cb_init(cb, BUFF_SIZE);
 
     /************** CREATE RAPORT FILE ********************/
@@ -638,8 +618,7 @@ int main(int argc, char* argv[])
     create_socket(&A, port, addr, &producer_fd);
 
     /************** CREATE DATA RAPORT STRUCTURE ***************/
-    struct dataraport* data_raport;
-    data_raport = (struct dataraport*)malloc(sizeof(struct dataraport) * consumer_max); //!
+    struct dataraport data_raport[consumer_max];
 
     /***********************************************************
     * MAIN LOOP
