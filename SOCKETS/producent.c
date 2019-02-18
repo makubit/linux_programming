@@ -29,7 +29,7 @@ char* str_loop = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 static int PRODUCTION = 1;
 static int START_PRODUCTION = 1;
 static int connected = 0;
-static int consumer_max = 50;
+static int consumer_max = 100;
 static int returned_fds = 0;
 static int consumer_counter = 0;
 
@@ -74,6 +74,8 @@ struct dataraport {
         memcpy(&cbuf->buff[cbuf->head], temp, (GEN_BLOCK_SIZE));
         cbuf->head = 0;
         cbuf->capacity+=(GEN_BLOCK_SIZE);
+
+        free(temp);
      }
      else //add only if capacity < max
      {
@@ -85,6 +87,8 @@ struct dataraport {
        cbuf->capacity+=(GEN_BLOCK_SIZE);
        cbuf->head+=(GEN_BLOCK_SIZE);
        cbuf->generated++;
+
+       free(temp);
      }
  }
 
@@ -129,6 +133,7 @@ void q_push(int fd)
    q_size++;
    tempItem = (struct customers_q*)malloc(sizeof(struct customers_q));
    (*tempItem).fd = fd;
+   (*tempItem).next = NULL;
    if(queue == NULL)
       first = tempItem;
    else
@@ -144,6 +149,7 @@ int q_pop()
       q_size--;
       int temp_fd = first->fd;
       tempItem = (*first).next;
+      free(first);
 
       first = tempItem;
       if(first == NULL)
@@ -375,6 +381,9 @@ void gen_raport_2(char* raport, struct dataraport data_raport) //lost connection
 
  void set_pollfds(struct pollfd* pfds, int dtimer_fd, int rtimer_fd, int producer_fd)
  {
+   for(int i =0 ;i < consumer_max; i++)
+    pfds[i].fd = -1;
+
    pfds[0].fd = dtimer_fd;
    pfds[0].events = POLLIN;
    pfds[1].fd = rtimer_fd;
@@ -457,8 +466,10 @@ void pfds_lost_connection(struct pollfd* pfds, struct dataraport* data_raport, i
   gen_raport_2(rapo, data_raport[i]);
   write(*raport_fd, rapo, strlen(rapo));
 
+  data_raport[i].consumer_fd = 0;
+
   close(pfds[i+3].fd);
-  pfds[i+3].fd = 0;
+  pfds[i+3].fd = -1;
   pfds[i+3].events = 0;
 
   connected--;
@@ -478,16 +489,16 @@ void pfds_send_data(c_buff* cb, struct dataraport* data_raport)
       memset(send_b, 0, (SEN_BLOCK_SIZE));
 
       cb_pop(cb, send_b);
-      send(cfd, send_b, (SEN_BLOCK_SIZE), 0);
+      send(cfd, send_b, (SEN_BLOCK_SIZE), MSG_NOSIGNAL);
 
-      /*for(int i = 0; i < consumer_counter; i++)
+      for(int i = 0; i < consumer_counter; i++)
       {
         if(data_raport[i].consumer_fd == cfd)
           {
             data_raport[i].data_blocks++;
             break;
           }
-      }*/
+      }
     }
 }
 
@@ -502,13 +513,15 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
   char* str_prod_point = str_loop;
 
   struct pollfd* pfds;
-  pfds = (struct pollfd*)malloc(sizeof(struct pollfd) * 53); ////
+  pfds = (struct pollfd*)malloc(sizeof(struct pollfd) * consumer_max); ////
   set_pollfds(pfds, dtimer_fd, rtimer_fd, producer_fd);
 
   while(PRODUCTION)
   {
     returned_fds = poll(pfds, consumer_max, -1);
-    for(int i = 0; i < returned_fds; i++)
+
+    //for(int i = 0; i < returned_fds; i++)
+    if(returned_fds > 0)
     {
         if(pfds[0].revents & POLLIN) //TIMER 1
         {
@@ -554,8 +567,6 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
               }
               else {
                 q_push(pfds[j+3].fd);
-
-                data_raport[j].data_blocks++; //requested
 
                 returned_fds--;
                 if(returned_fds == 0) //when we read all fds no need to continue

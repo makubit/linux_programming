@@ -221,6 +221,8 @@ void sleep_while_waiting()
      {
        *addr = (char*)malloc(sizeof(first_par));
        strcpy(*addr, first_par);
+       if(strcmp(*addr, "localhost"))
+        strcpy(*addr, "127.0.0.1");
 
        *port = strtol(second_par, NULL, 0);
 
@@ -233,12 +235,12 @@ void sleep_while_waiting()
      }
  }
 
- void set_timerfd(int timer_fd, int dly, struct itimerspec* ts)
+ void set_timerfd(int timer_fd, float dly, struct itimerspec* ts)
  {
    ts->it_interval.tv_sec = (long)(dly);
-   ts->it_interval.tv_nsec = (long)(dly * NANOSEC) % NANOSEC;
+   ts->it_interval.tv_nsec = (long)(dly * (NANOSEC)) % (NANOSEC);
    ts->it_value.tv_sec = (long)(dly);
-   ts->it_value.tv_nsec = (long)(dly * NANOSEC) % NANOSEC;
+   ts->it_value.tv_nsec = (long)(dly * (NANOSEC)) % (NANOSEC);
 
    if(timerfd_settime(timer_fd, 0, ts, NULL) < 0)
    {
