@@ -31,7 +31,6 @@ static int START_PRODUCTION = 1;
 static int connected = 0;
 static int consumer_max = 100;
 static int returned_fds = 0;
-static int consumer_counter = 0;
 
 struct dataraport {
   int consumer_fd;
@@ -420,6 +419,27 @@ void pfds_rtimer(int* rtimer_fd, c_buff* cb, int* raport_fd)
   returned_fds--;
 }
 
+int pfds_find_free_fd(struct pollfd* pfds)
+{
+  int i = 0;
+  while(pfds[i].fd != -1)
+  {
+    i++;
+  }
+
+  return i;
+}
+
+int pfds_find_fd(struct dataraport* data_raport, int cfd)
+{
+  for(int i = 0; i < consumer_max; i++)
+  {
+    if(data_raport[i].consumer_fd == cfd)
+        return i;
+  }
+  return -1;
+}
+
 void pfds_new_connection(struct pollfd* pfds, int* producer_fd, struct dataraport* data_raport, int* raport_fd)
 {
   //struct for sockaddress
@@ -427,21 +447,21 @@ void pfds_new_connection(struct pollfd* pfds, int* producer_fd, struct datarapor
   int addr_lenB = sizeof(B);
 
   //add fd to poll struct
-  pfds[consumer_counter+3].events = POLLIN;
-  pfds[consumer_counter+3].fd  = accept(*producer_fd, (struct sockaddr*)&B, (socklen_t*)&addr_lenB);
-  if(pfds[consumer_counter+3].fd  == -1)
+  int free_fd = pfds_find_free_fd(pfds);
+  pfds[free_fd].events = POLLIN;
+  pfds[free_fd].fd  = accept(*producer_fd, (struct sockaddr*)&B, (socklen_t*)&addr_lenB);
+  if(pfds[free_fd].fd  == -1)
   {
       perror("Accept error\n");
       exit(EXIT_FAILURE);
   }
 
   //add to dataraport structure
-  data_raport[consumer_counter].consumer_fd = pfds[consumer_counter+3].fd;
-  data_raport[consumer_counter].ip_addr = inet_ntoa(B.sin_addr);
-  data_raport[consumer_counter].data_blocks = 0;
+  data_raport[free_fd-3].consumer_fd = pfds[free_fd].fd;
+  data_raport[free_fd-3].ip_addr = inet_ntoa(B.sin_addr);
+  data_raport[free_fd-3].data_blocks = 0;
 
   connected++;
-  consumer_counter++;
   returned_fds--;
 
   //after new connection -> generate raport
@@ -451,14 +471,18 @@ void pfds_new_connection(struct pollfd* pfds, int* producer_fd, struct datarapor
   write(*raport_fd, rapo, strlen(rapo));
 }
 
-void pfds_lost_connection(struct pollfd* pfds, struct dataraport* data_raport, int i, int* raport_fd)
+void pfds_lost_connection(struct pollfd* pfds, struct dataraport* data_raport, int cfd, int* raport_fd)
 {
   char rapo[512];
   memset(rapo, 0, sizeof(rapo));
+
+  int i = pfds_find_fd(data_raport, cfd);
   gen_raport_2(rapo, data_raport[i]);
   write(*raport_fd, rapo, strlen(rapo));
 
   data_raport[i].consumer_fd = 0;
+  data_raport[i].data_blocks = 0;
+  data_raport[i].ip_addr = NULL;
 
   close(pfds[i+3].fd);
   pfds[i+3].fd = -1;
@@ -483,14 +507,8 @@ void pfds_send_data(c_buff* cb, struct dataraport* data_raport)
       cb_pop(cb, send_b);
       send(cfd, send_b, (SEN_BLOCK_SIZE), MSG_NOSIGNAL);
 
-      for(int i = 0; i < consumer_counter; i++)
-      {
-        if(data_raport[i].consumer_fd == cfd)
-          {
-            data_raport[i].data_blocks++;
-            break;
-          }
-      }
+      int i = pfds_find_fd(data_raport, cfd);
+      data_raport[i].data_blocks++;
     }
 }
 
@@ -536,7 +554,7 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
         //other fds
         if(returned_fds > 0) //AD CONSUMER TO QUEUE OR DISCONNECT
         {
-          for(int j = 0; j < consumer_counter; j++)
+          for(int j = 0; j < consumer_max; j++)
           {
             if(pfds[j+3].revents & POLLIN)
             {
@@ -544,7 +562,7 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
               char recvmes[4];
               if(!recv(pfds[j+3].fd, recvmes, sizeof(recvmes), 0))
               {
-                pfds_lost_connection(pfds, data_raport, j, &raport_fd);
+                pfds_lost_connection(pfds, data_raport, pfds[j+3].fd, &raport_fd);
               }
               else {
                 q_push(pfds[j+3].fd);
@@ -556,7 +574,7 @@ void do_poll_loop(int dtimer_fd, int rtimer_fd, int producer_fd, c_buff* cb, str
             }
             else if((pfds[j+3].revents & POLLERR) || (pfds[j+3].revents & POLLHUP) || (pfds[j+3].revents & POLLNVAL))
             { //error - lost connection
-              pfds_lost_connection(pfds, data_raport, j, &raport_fd);
+              pfds_lost_connection(pfds, data_raport, pfds[j+3].fd, &raport_fd);
             }
           }
         }
