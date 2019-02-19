@@ -4,6 +4,8 @@ LIBBUF/
 TEST_PARAMETERS/
 zajecia/
 SOCKETS_OLD/
+PROCESSESS_OLD/
+FILE\ IO/
 
 # Compiled source
 *.com
