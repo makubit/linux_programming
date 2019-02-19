@@ -5,7 +5,7 @@ TEST_PARAMETERS/
 zajecia/
 SOCKETS_OLD/
 PROCESSES_OLD/
-FILE\ IO/
+FILE_IO/
 
 # Compiled source
 *.com
